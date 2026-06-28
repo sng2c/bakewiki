@@ -13,6 +13,10 @@ npx bakewiki serve
 
 Spec in progress — see [`docs/SPEC.md`](docs/SPEC.md).
 
+## Acknowledgements
+
+Specification & design support by [@ririnto](https://github.com/ririnto).
+
 ## License
 
 AGPL-3.0-or-later
