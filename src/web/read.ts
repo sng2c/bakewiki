@@ -17,6 +17,7 @@ async function renderPage(db: DB, slug: string, authed: boolean): Promise<string
 	const view = {
 		page: { ...page, updatedAt: page.updatedAt.toISOString().slice(0, 10) },
 		html,
+		user: authed, // page 템플릿의 Edit 버튼 표시용
 	};
 	return renderTemplate("page", view, { title: page.title, user: authed, q: "" });
 }

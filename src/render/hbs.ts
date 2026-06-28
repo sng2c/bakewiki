@@ -65,7 +65,7 @@ textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; 
 {{{html}}}
 </article>
 {{#if user}}
-<p><a href="/edit/{{page.slug}}">Edit</a></p>
+<p style="margin-top:2rem"><a class="btn" href="/edit/{{page.slug}}">Edit</a></p>
 {{/if}}`,
 
 	list: `<h1>All pages</h1>
