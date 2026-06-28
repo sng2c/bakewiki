@@ -3,7 +3,7 @@ CREATE TABLE `pages` (
 	`slug` text NOT NULL,
 	`title` text NOT NULL,
 	`content` text NOT NULL,
-	`public` integer DEFAULT true NOT NULL,
+	`is_public` integer DEFAULT true NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );

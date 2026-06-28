@@ -15,7 +15,7 @@ export const pages = sqliteTable("pages", {
 	slug: text("slug").notNull().unique(),
 	title: text("title").notNull(),
 	content: text("content").notNull(),
-	public: integer("public", { mode: "boolean" }).notNull().default(true),
+	isPublic: integer("is_public", { mode: "boolean" }).notNull().default(true),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.$defaultFn(() => new Date()),

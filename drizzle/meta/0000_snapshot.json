@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7662f4c9-43ef-423d-bf1f-3cbadb93238e",
+  "id": "4f6af14b-f7a2-43e7-8c31-d0a39f4e81a8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "pages": {
@@ -35,8 +35,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "public": {
-          "name": "public",
+        "is_public": {
+          "name": "is_public",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

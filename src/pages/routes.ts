@@ -30,7 +30,7 @@ export function pageRoutes(db: DB): Hono<AppEnv> {
 		const page = await getPage(db, slug);
 		if (!page) return c.json({ error: "Not found" }, 404);
 		const user = c.get("user");
-		if (!page.public && !user) {
+		if (!page.isPublic && !user) {
 			return c.json({ error: "Not found" }, 404);
 		}
 		return c.json({ page });
@@ -57,7 +57,7 @@ export function pageRoutes(db: DB): Hono<AppEnv> {
 		return c.json({
 			slug: saved!.slug,
 			title: saved!.title,
-			public: saved!.public,
+			public: saved!.isPublic,
 			updatedAt: saved!.updatedAt,
 		});
 	});

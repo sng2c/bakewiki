@@ -61,7 +61,7 @@ textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; 
 
 	page: `<article>
 <h1>{{page.title}}</h1>
-<div class="page-meta">{{#if page.public}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</div>
+<div class="page-meta">{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</div>
 {{{html}}}
 </article>
 {{#if user}}
@@ -71,7 +71,7 @@ textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; 
 	list: `<h1>All pages</h1>
 <ul class="pages">
 {{#each pages}}
-<li><a href="/page/{{slug}}">{{title}}</a> <span class="muted">{{slug}}{{#unless public}} 🔒{{/unless}}</span></li>
+<li><a href="/page/{{slug}}">{{title}}</a> <span class="muted">{{slug}}{{#unless isPublic}} 🔒{{/unless}}</span></li>
 {{/each}}
 </ul>`,
 

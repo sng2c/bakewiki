@@ -18,13 +18,11 @@ CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-	INSERT INTO pages_fts(pages_fts, rowid, slug, title, content)
-	VALUES ('delete', old.id, old.slug, old.title, old.content);
+	DELETE FROM pages_fts WHERE rowid = old.id;
 END;
 
 CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-	INSERT INTO pages_fts(pages_fts, rowid, slug, title, content)
-	VALUES ('delete', old.id, old.slug, old.title, old.content);
+	DELETE FROM pages_fts WHERE rowid = old.id;
 	INSERT INTO pages_fts(rowid, slug, title, content)
 	VALUES (new.id, new.slug, new.title, new.content);
 END;
@@ -52,7 +50,7 @@ export type SearchResult = {
 const SEARCH_SQL = `
 SELECT p.slug AS slug, p.title AS title,
 	snippet(pages_fts, 2, '<mark>', '</mark>', '...', 20) AS snippet,
-	p.public AS public
+	p.is_public AS is_public
 FROM pages_fts
 JOIN pages p ON p.id = pages_fts.rowid
 WHERE pages_fts MATCH ?
@@ -65,9 +63,9 @@ export function searchPages(db: DB, query: string, includePrivate = false): Sear
 		slug: string;
 		title: string;
 		snippet: string;
-		public: number;
+		is_public: number;
 	}>;
 	return rows
-		.filter((r) => includePrivate || r.public === 1)
+		.filter((r) => includePrivate || r.is_public === 1)
 		.map((r) => ({ slug: r.slug, title: r.title, snippet: r.snippet }));
 }

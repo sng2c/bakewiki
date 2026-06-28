@@ -8,12 +8,12 @@ export type Page = {
 	slug: string;
 	title: string;
 	content: string;
-	public: boolean;
+	isPublic: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 };
 
-export type PageSummary = Pick<Page, "slug" | "title" | "updatedAt">;
+export type PageSummary = Pick<Page, "slug" | "title" | "updatedAt" | "isPublic">;
 
 function parse(raw: string): ParsedDocument & { title: string; public: boolean } {
 	const doc = parseDocument(raw);
@@ -27,28 +27,28 @@ export async function getPage(db: DB, slug: string): Promise<Page | null> {
 
 export async function listPages(db: DB, includePrivate = false): Promise<PageSummary[]> {
 	const rows = await db
-		.select({ slug: pages.slug, title: pages.title, updatedAt: pages.updatedAt, public: pages.public })
+		.select({ slug: pages.slug, title: pages.title, updatedAt: pages.updatedAt, isPublic: pages.isPublic })
 		.from(pages);
-	return rows.filter((r) => includePrivate || r.public);
+	return rows.filter((r) => includePrivate || r.isPublic);
 }
 
 export async function createPage(db: DB, slug: string, content: string): Promise<Page> {
 	const p = parse(content);
-	const [row] = await db
+	await db
 		.insert(pages)
-		.values({ slug, title: p.title, content, public: p.public })
-		.returning();
-	return row as Page;
+		.values({ slug, title: p.title, content, isPublic: p.public });
+	const rows = await db.select().from(pages).where(eq(pages.slug, slug)).limit(1);
+	return rows[0] as Page;
 }
 
 export async function updatePage(db: DB, slug: string, content: string): Promise<Page | null> {
 	const p = parse(content);
-	const [row] = await db
+	await db
 		.update(pages)
-		.set({ title: p.title, content, public: p.public, updatedAt: new Date() })
-		.where(eq(pages.slug, slug))
-		.returning();
-	return (row as Page) ?? null;
+		.set({ title: p.title, content, isPublic: p.public, updatedAt: new Date() })
+		.where(eq(pages.slug, slug));
+	const rows = await db.select().from(pages).where(eq(pages.slug, slug)).limit(1);
+	return (rows[0] as Page) ?? null;
 }
 
 export async function deletePage(db: DB, slug: string): Promise<void> {

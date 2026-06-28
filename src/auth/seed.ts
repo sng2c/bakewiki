@@ -15,7 +15,9 @@ export async function seedAdmin(
 	if (existing[0]) return { created: false };
 
 	const passwordHash = await hashPassword(password);
-	const [user] = await db.insert(users).values({ email, passwordHash }).returning({ id: users.id });
+	await db.insert(users).values({ email, passwordHash });
+	const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+	const user = rows[0]!;
 	const apiKey = await issueApiKey(db, user.id);
 	return { created: true, apiKey };
 }

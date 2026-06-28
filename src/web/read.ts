@@ -11,11 +11,11 @@ import { renderTemplate } from "../render/hbs.js";
 async function renderPage(db: DB, slug: string, authed: boolean): Promise<string | null> {
 	const page = await getPage(db, slug);
 	if (!page) return null;
-	if (!page.public && !authed) return null;
+	if (!page.isPublic && !authed) return null;
 	const doc = parseDocument(page.content);
 	const html = renderMarkdown(doc.body);
 	const view = {
-		page: { ...page, updatedAt: page.updatedAt.toISOString().slice(0, 10) },
+		page: { ...page, isPublic: page.isPublic, updatedAt: page.updatedAt.toISOString().slice(0, 10) },
 		html,
 		user: authed, // page 템플릿의 Edit 버튼 표시용
 	};
