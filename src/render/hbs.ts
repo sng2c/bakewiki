@@ -40,6 +40,7 @@ textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; 
 <body>
 <nav>
 <a href="/">Home</a>
+<a href="/pages">Pages</a>
 <a href="/search">Search</a>
 {{#if user}}
 <a href="/edit">New</a>
@@ -100,7 +101,7 @@ textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; 
 {{#if error}}<p style="color:red">{{error}}</p>{{/if}}`,
 
 	editor: `<h1>{{#if page}}Edit: {{page.title}}{{else}}New page{{/if}}</h1>
-<form action="/edit/{{#if page}}{{page.slug}}{{/if}}" method="post">
+<form action="/edit" method="post">
 <label>Slug <span class="muted">(path, e.g. tech/web/http)</span></label>
 <input type="text" name="slug" value="{{#if page}}{{page.slug}}{{else}}{{slug}}{{/if}}" style="width:100%;padding:0.4rem;margin-bottom:0.5rem" {{#if page}}readonly{{/if}}>
 <label>Content (GFM, with YAML frontmatter)</label>

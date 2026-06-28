@@ -34,15 +34,6 @@ export function webEditRoutes(db: DB): Hono<AppEnv> {
 		return c.redirect(`/page/${slug}`);
 	});
 
-	app.post("/edit/:slug{.+}", requireAuth, async (c) => {
-		const slug = c.req.param("slug")!;
-		const form = await c.req.formData();
-		const content = String(form.get("content") ?? "");
-		const existing = await getPage(db, slug);
-		existing ? await updatePage(db, slug, content) : await createPage(db, slug, content);
-		return c.redirect(`/page/${slug}`);
-	});
-
 	// 삭제 (POST /delete/:slug)
 	app.post("/delete/:slug{.+}", requireAuth, async (c) => {
 		const slug = c.req.param("slug")!;
