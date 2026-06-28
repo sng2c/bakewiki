@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { serveCommand } from "./cli/serve.js";
 import { initCommand } from "./cli/init.js";
 import { importCommand } from "./cli/import.js";
