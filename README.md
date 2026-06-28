@@ -15,7 +15,7 @@ Spec in progress — see [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Acknowledgements
 
-Specification & design support by [@ririnto](https://github.com/ririnto).
+Thanks to [@ririnto](https://github.com/ririnto) for supporting this project.
 
 ## License
 
