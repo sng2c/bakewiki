@@ -75,4 +75,21 @@
 
 ---
 
-## 5. 마크다운 렌더링 (render) — 현재 단계
+## 5. 마크다운 렌더링 (render) ✅ 완료
+
+### 파일
+- `src/render/markdown.ts` — markdown-it(GFM) + highlight.js + @vscode/markdown-it-katex
+- `src/render/hbs.ts` — Handlebars + 레이아웃 + 템플릿(page/list/search/notFound/login/editor) + 미니멀 CSS
+- `src/web/read.ts` — 홈(목록), 검색, 문서 조회 SSR (/page/:slug{.+})
+- `src/web/auth.ts` — 로그인/로그아웃 (폼 기반)
+- `src/web/edit.ts` — 에디터(새 문서/편집/삭제), textarea
+- `src/app.ts` — 웹 라우트 마운트 추가
+
+### 결정사항
+- 정적 자산(CSS): highlight.js, KaTeX CDN
+- Milkdown: MVP는 textarea, CDN 업그레이드 예정
+- 관리자 신뢰 → html: true (Sanitize 생략)
+- 웹 라우트는 `/`, `/search`, `/page/:slug`, `/login`, `/edit(/:slug)`, `/delete/:slug`
+
+### 검증 완료
+- 홈 HTML, 페이지 렌더링(hljs+katex), 검색, 로그인(쿠키 세션), 편집 페이지, 새 문서 페이지

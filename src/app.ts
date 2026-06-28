@@ -7,6 +7,9 @@ import { pageRoutes } from "./pages/routes.js";
 import { searchPages } from "./pages/search.js";
 import { ensureFts } from "./pages/search.js";
 import { listPages } from "./pages/store.js";
+import { webReadRoutes } from "./web/read.js";
+import { webAuthRoutes } from "./web/auth.js";
+import { webEditRoutes } from "./web/edit.js";
 
 export function createApp(db: DB): Hono<AppEnv> {
 	ensureFts(db);
@@ -23,13 +26,13 @@ export function createApp(db: DB): Hono<AppEnv> {
 	// 헬스체크
 	app.get("/api/health", (c) => c.json({ ok: true }));
 
-	// 인증
+	// 인증 API
 	app.route("/auth", authRoutes(db));
 
-	// 문서
+	// 문서 API
 	app.route("/api/pages", pageRoutes(db));
 
-	// 검색 (SPEC: /api/search)
+	// 검색 API (SPEC: /api/search)
 	app.get("/api/search", async (c) => {
 		const q = c.req.query("q");
 		if (!q) return c.json({ results: [] });
@@ -38,13 +41,18 @@ export function createApp(db: DB): Hono<AppEnv> {
 		return c.json({ results });
 	});
 
-	// sitemap (TODO: 단위 2-7에서 구현)
+	// sitemap API
 	app.get("/api/sitemap", async (c) => {
 		const user = c.get("user");
 		const list = await listPages(db, !!user);
 		const tree = buildSitemapTree(list.map((p) => p.slug));
 		return c.json({ tree });
 	});
+
+	// 웹 UI (HTML SSR)
+	app.route("/", webAuthRoutes(db));
+	app.route("/", webEditRoutes(db));
+	app.route("/", webReadRoutes(db));
 
 	return app;
 }

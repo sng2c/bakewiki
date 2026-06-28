@@ -13,12 +13,18 @@
   },
   "dependencies": {
     "@hono/node-server": "2.0.6",
+    "@types/markdown-it": "14.1.2",
+    "@vscode/markdown-it-katex": "1.1.2",
     "bcrypt": "6.0.0",
     "better-sqlite3": "12.11.1",
     "drizzle-orm": "0.45.2",
     "dotenv": "17.4.2",
+    "handlebars": "4.7.9",
+    "highlight.js": "11.11.1",
     "hono": "4.12.27",
     "jose": "6.2.3",
+    "katex": "0.17.0",
+    "markdown-it": "14.2.0",
     "yaml": "2.9.0"
   },
   "devDependencies": {
