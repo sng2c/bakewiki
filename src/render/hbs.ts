@@ -43,6 +43,11 @@ textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; 
 <a href="/search">Search</a>
 {{#if user}}
 <a href="/edit">New</a>
+<form action="/logout" method="post" style="margin:0;display:inline">
+<button type="submit" style="background:none;border:none;color:#2563eb;cursor:pointer;padding:0;font-size:inherit">Logout</button>
+</form>
+{{else}}
+<a href="/login">Login</a>
 {{/if}}
 <form action="/search" method="get">
 <input type="text" name="q" placeholder="search..." value="{{q}}">
