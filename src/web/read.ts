@@ -25,12 +25,12 @@ async function renderPage(db: DB, slug: string, authed: boolean): Promise<string
 export function webReadRoutes(db: DB): Hono<AppEnv> {
 	const app = new Hono<AppEnv>();
 
-	// 홈 = /index 페이지. 없으면 새로 만들기(edit/index)로.
+	// 홈 = /index 페이지. 없으면 notFound.
 	app.get("/", async (c) => {
 		const user = c.get("user");
 		const html = await renderPage(db, "index", !!user);
 		if (html) return c.html(html);
-		return c.redirect("/edit/index");
+		return c.html(renderTemplate("notFound", { slug: "index", canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
 	});
 
 	// 전체 목록 (/pages)
@@ -50,13 +50,13 @@ export function webReadRoutes(db: DB): Hono<AppEnv> {
 		return c.html(html);
 	});
 
-	// 문서 조회 (/page/:slug{.+}). 없으면 edit로 (위키 동작).
+	// 문서 조회 (/page/:slug{.+}). 없으면 notFound + 만들기 링크.
 	app.get("/page/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug")!;
 		const user = c.get("user");
 		const html = await renderPage(db, slug, !!user);
 		if (html) return c.html(html);
-		return c.redirect(`/edit/${slug}`);
+		return c.html(renderTemplate("notFound", { slug, canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
 	});
 
 	return app;

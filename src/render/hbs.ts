@@ -87,7 +87,14 @@ textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; 
 {{/if}}`,
 
 	notFound: `<h1>Not found</h1>
-<p>The page you requested does not exist.</p>
+<p>The page <strong>{{slug}}</strong> does not exist.</p>
+<p>
+{{#if canCreate}}
+<a class="btn" href="/edit/{{slug}}">Create this page</a>
+{{else}}
+<a href="/login">Login</a> to create it.
+{{/if}}
+</p>
 <p><a href="/">Home</a></p>`,
 
 	login: `<h1>Login</h1>
