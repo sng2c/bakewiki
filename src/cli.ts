@@ -13,31 +13,34 @@ function help(): void {
 	console.log(`bakewiki ${VERSION}
 
 Usage:
-  bakewiki init --data <path>               Initialize data directory
-  bakewiki admin create --data <path>        Create admin account
-  bakewiki serve --data <path> [options]    Start HTTP server
-  bakewiki import <dir> --data <path>       Import markdown folder into wiki
-  bakewiki export <dir> --data <path>       Export wiki to markdown folder
-  bakewiki remote <cmd> [args] --key <key>  Remote page operations
-  bakewiki version                           Show version
-  bakewiki help                              Show this help
+  bakewiki [global options] <command> [command options]
 
-Common options:
-  --data <path>   Data directory (required, or set BAKEWIKI_DATA_DIR)
+Global options:
+  --data <path>    Data directory (required for local commands, env: BAKEWIKI_DATA_DIR)
+  --version, -v    Show version
+  --help, -h       Show this help
+
+Commands:
+  init              Initialize data directory
+  admin create      Create admin account
+  serve             Start HTTP server
+  import <dir>      Import markdown folder into wiki
+  export <dir>      Export wiki to markdown folder
+  remote <cmd>      Remote page operations
 
 Serve options:
-  --host <addr>    Bind address (default: 127.0.0.1, env: BAKEWIKI_HOST)
+  --host <addr>     Bind address (default: 127.0.0.1, env: BAKEWIKI_HOST)
   --port <number>   Port number (default: 3000, env: BAKEWIKI_PORT)
 
 Remote commands:
-  remote list [--url <url>] --key <key>             List pages
-  remote get <slug> [--url <url>] --key <key>       Get page content
-  remote create <slug> <file> [--url <url>] --key   Create/update page
-  remote rename <old> <new> [--url <url>] --key      Rename page
-  remote delete <slug> [--url <url>] --key           Delete page
-  remote search <query> [--url <url>] --key          Search pages
-  remote sitemap [--url <url>] --key              Show page tree
-  remote health [--url <url>]                  Health check
+  list [--url <url>] --key <key>              List pages
+  get <slug> [--url <url>] --key <key>         Get page content
+  create <slug> <file> [--url <url>] --key      Create/update page
+  rename <old> <new> [--url <url>] --key        Rename page
+  delete <slug> [--url <url>] --key             Delete page
+  search <query> [--url <url>] --key            Search pages
+  sitemap [--url <url>] --key                   Show page tree
+  health [--url <url>]                          Health check
 
 Remote options:
   --url <url>     Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
@@ -45,18 +48,24 @@ Remote options:
 `);
 }
 
-// --data 플래그를 args에서 추출. 나머지 인수를 반환.
-function extractData(args: string[]): { dataDir?: string; rest: string[] } {
-	const rest: string[] = [];
+// 전체 인수에서 글로벌 옵션(--data, --version, --help)을 추출하고 서브커맨드+나머지를 반환.
+function parseGlobalArgs(args: string[]): { dataDir?: string; cmd?: string; rest: string[] } {
 	let dataDir: string | undefined;
+	const positional: string[] = [];
+
 	for (let i = 0; i < args.length; i++) {
 		if (args[i] === "--data" && args[i + 1]) {
 			dataDir = args[++i];
+		} else if (args[i] === "--version" || args[i] === "-v") {
+			return { cmd: "version", rest: [], dataDir };
+		} else if (args[i] === "--help" || args[i] === "-h") {
+			return { cmd: "help", rest: [], dataDir };
 		} else {
-			rest.push(args[i]);
+			positional.push(args[i]);
 		}
 	}
-	return { dataDir, rest };
+
+	return { dataDir, cmd: positional[0], rest: positional.slice(1) };
 }
 
 // serve 서브커맨드 인자 파싱: --host <addr>, --port <number>
@@ -82,8 +91,8 @@ function parseServeArgs(args: string[]): { port?: number; hostname?: string } {
 }
 
 async function main(): Promise<void> {
-	const [, , cmd, ...allArgs] = process.argv;
-	const { dataDir, rest } = extractData(allArgs);
+	const [, , ...allArgs] = process.argv;
+	const { dataDir, cmd, rest } = parseGlobalArgs(allArgs);
 
 	switch (cmd) {
 		case "init":
@@ -93,7 +102,7 @@ async function main(): Promise<void> {
 			if (rest[0] === "create") {
 				await adminCreateCommand(dataDir);
 			} else {
-				console.error("Usage: bakewiki admin create --data <path>");
+				console.error("Usage: bakewiki --data <path> admin create");
 				process.exit(1);
 			}
 			break;
@@ -102,14 +111,14 @@ async function main(): Promise<void> {
 			break;
 		case "import":
 			if (!rest[0]) {
-				console.error("Usage: bakewiki import <dir> --data <path>");
+				console.error("Usage: bakewiki --data <path> import <dir>");
 				process.exit(1);
 			}
 			await importCommand(rest[0], dataDir);
 			break;
 		case "export":
 			if (!rest[0]) {
-				console.error("Usage: bakewiki export <dir> --data <path>");
+				console.error("Usage: bakewiki --data <path> export <dir>");
 				process.exit(1);
 			}
 			await exportCommand(rest[0], dataDir);
@@ -117,27 +126,22 @@ async function main(): Promise<void> {
 		case "remote": {
 			const sub = rest[0];
 			if (!sub) {
-				console.error("Usage: bakewiki remote <list|get|create|rename|delete> [args] --key <key>");
+				console.error("Usage: bakewiki remote <list|get|create|rename|delete|search|sitemap|health> [args]");
 				process.exit(1);
 			}
 			await remoteCommand(sub, rest.slice(1));
 			break;
 		}
 		case "version":
-		case "-v":
-		case "--version":
 			console.log(VERSION);
 			break;
 		case "help":
-		case "-h":
-		case "--help":
-		case undefined:
 			help();
 			break;
 		default:
-			console.error(`Unknown command: ${cmd}`);
+			if (cmd) console.error(`Unknown command: ${cmd}`);
 			help();
-			process.exit(1);
+			process.exit(cmd ? 1 : 0);
 	}
 }
 
