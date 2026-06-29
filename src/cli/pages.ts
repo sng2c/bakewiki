@@ -120,8 +120,8 @@ function validateKey(key: string): void {
 
 // ── pages 서브커맨드 ──
 
-export async function remoteCommand(subcommand: string, allArgs: string[]): Promise<void> {
-	const { opts, rest } = extractRemoteOpts(allArgs);
+export async function remoteCommand(subcommand: string, allArgs: string[], opts: RemoteOpts): Promise<void> {
+	const rest = allArgs;
 
 	switch (subcommand) {
 		case "list":

@@ -5,7 +5,7 @@ import { initCommand } from "./cli/init.js";
 import { adminCreateCommand } from "./cli/admin.js";
 import { importCommand } from "./cli/import.js";
 import { exportCommand } from "./cli/export.js";
-import { remoteCommand } from "./cli/pages.js";
+import { remoteCommand, extractRemoteOpts } from "./cli/pages.js";
 
 const VERSION = "0.0.4";
 
@@ -33,16 +33,16 @@ Serve options:
   --port <number>   Port number (default: 3000, env: BAKEWIKI_PORT)
 
 Remote commands:
-  list [--url <url>] --key <key>              List pages
-  get <slug> [--url <url>] --key <key>         Get page content
-  create <slug> <file> [--url <url>] --key      Create/update page
-  rename <old> <new> [--url <url>] --key        Rename page
-  delete <slug> [--url <url>] --key             Delete page
-  search <query> [--url <url>] --key            Search pages
-  sitemap [--url <url>] --key                   Show page tree
-  health [--url <url>]                          Health check
+  list [options]                             List pages
+  get <slug> [options]                           Get page content
+  create <slug> <file> [options]                 Create/update page
+  rename <old> <new> [options]                   Rename page
+  delete <slug> [options]                        Delete page
+  search <query> [options]                       Search pages
+  sitemap [options]                           Show page tree
+  health [options]                            Health check
 
-Remote options:
+Remote options (before or after subcommand):
   --url <url>     Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
   --key <apikey>  API key (or set BAKEWIKI_API_KEY)
 `);
@@ -124,12 +124,13 @@ async function main(): Promise<void> {
 			await exportCommand(rest[0], dataDir);
 			break;
 		case "remote": {
-			const sub = rest[0];
+			const { opts: remoteOpts, rest: remoteRest } = extractRemoteOpts(rest);
+			const sub = remoteRest[0];
 			if (!sub) {
-				console.error("Usage: bakewiki remote <list|get|create|rename|delete|search|sitemap|health> [args]");
+				console.error("Usage: bakewiki remote [options] <list|get|create|rename|delete|search|sitemap|health>");
 				process.exit(1);
 			}
-			await remoteCommand(sub, rest.slice(1));
+			await remoteCommand(sub, remoteRest.slice(1), remoteOpts);
 			break;
 		}
 		case "version":
