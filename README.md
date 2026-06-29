@@ -119,18 +119,155 @@ Page content...
 
 ## API
 
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| `GET` | `/api/pages` | List pages | Optional |
-| `GET` | `/api/pages/:slug` | Get page (follows redirects) | Optional |
-| `POST` | `/api/pages/:slug` | Create/update page | Required |
-| `PATCH` | `/api/pages/:slug` | Rename page | Required |
-| `DELETE` | `/api/pages/:slug` | Delete page | Required |
-| `GET` | `/api/search?q=` | Search pages | Optional |
-| `GET` | `/api/sitemap` | Sitemap tree | Optional |
-| `GET` | `/api/health` | Health check | None |
+All API endpoints are under `/api`. Authentication uses `Authorization: Bearer <api-key>` header or session cookie.
 
-Auth: `Authorization: Bearer <api-key>` header or session cookie.
+### Pages
+
+#### List pages
+
+```
+GET /api/pages
+```
+
+Response `200`:
+```json
+{
+  "pages": [
+    { "slug": "index", "title": "Home", "isPublic": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+    { "slug": "docs/api", "title": "API Docs", "isPublic": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+  ]
+}
+```
+Unauthenticated requests only return public pages.
+
+#### Get page
+
+```
+GET /api/pages/:slug
+```
+
+Response `200`:
+```json
+{
+  "page": {
+    "slug": "index",
+    "title": "Home",
+    "content": "---\ntitle: Home\npublic: true\n---\nWelcome!",
+    "isPublic": true,
+    "updatedAt": "2026-06-29T12:00:00.000Z"
+  }
+}
+```
+
+Response `301` (redirect):
+```json
+{ "redirect": "new-slug" }
+```
+
+Response `404`: `{ "error": "Not found" }`
+
+Unauthenticated requests return 404 for private pages.
+
+#### Create or update page
+
+```
+POST /api/pages/:slug
+Content-Type: application/json
+Authorization: Bearer <api-key>
+
+{ "content": "---\ntitle: My Page\npublic: true\n---\nHello world" }
+```
+
+Response `200`:
+```json
+{ "slug": "my-page", "title": "My Page", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+```
+
+Creates if the slug doesn't exist, updates if it does. `content` must be a string containing the full page body (frontmatter + markdown).
+
+#### Rename page
+
+```
+PATCH /api/pages/:slug
+Content-Type: application/json
+Authorization: Bearer <api-key>
+
+{ "slug": "new-slug" }
+```
+
+Response `200`:
+```json
+{ "slug": "new-slug", "title": "My Page", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+```
+
+Response `409`: `{ "error": "Not found or target slug already exists" }`
+
+Creates a redirect from the old slug to the new one.
+
+#### Delete page
+
+```
+DELETE /api/pages/:slug
+Authorization: Bearer <api-key>
+```
+
+Response `200`: `{ "ok": true }`
+
+Response `404`: `{ "error": "Not found" }`
+
+### Search
+
+```
+GET /api/search?q=keyword
+```
+
+Response `200`:
+```json
+{
+  "results": [
+    { "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
+  ]
+}
+```
+
+Returns empty results if `q` is missing. Unauthenticated requests only search public pages.
+
+### Sitemap
+
+```
+GET /api/sitemap
+```
+
+Response `200`:
+```json
+{
+  "tree": [
+    { "slug": "index", "children": [] },
+    { "slug": "docs", "children": [
+      { "slug": "docs/api", "children": [] }
+    ] }
+  ]
+}
+```
+
+Hierarchical tree of all pages. Unauthenticated requests only include public pages.
+
+### Health
+
+```
+GET /api/health
+```
+
+Response `200`: `{ "ok": true }`
+
+No authentication required.
+
+### Slug rules
+
+- No leading/trailing `/`
+- No `..` segments
+- Slugs like `tech/web/http` create a hierarchy
+- Redirects are tracked in `redirects.json` when slugs are renamed
 
 ## Development
 

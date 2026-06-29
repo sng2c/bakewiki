@@ -126,18 +126,155 @@ public: true
 
 ## API
 
-| 메서드 | 경로 | 설명 | 인증 |
-|--------|------|------|------|
-| `GET` | `/api/pages` | 문서 목록 | 선택 |
-| `GET` | `/api/pages/:slug` | 문서 조회 | 선택 |
-| `POST` | `/api/pages/:slug` | 문서 생성/수정 | 필요 |
-| `PATCH` | `/api/pages/:slug` | 문서 이름 변경 | 필요 |
-| `DELETE` | `/api/pages/:slug` | 문서 삭제 | 필요 |
-| `GET` | `/api/search?q=` | 검색 | 선택 |
-| `GET` | `/api/sitemap` | 사이트맵 | 선택 |
-| `GET` | `/api/health` | 헬스체크 | 없음 |
+모든 API 엔드포인트는 `/api` 하위에 있습니다. 인증은 `Authorization: Bearer <api-key>` 헤더 또는 세션 쿠키를 사용합니다.
 
-인증: `Authorization: Bearer <api-key>` 헤더 또는 세션 쿠키.
+### 문서
+
+#### 문서 목록
+
+```
+GET /api/pages
+```
+
+응답 `200`:
+```json
+{
+  "pages": [
+    { "slug": "index", "title": "Home", "isPublic": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+    { "slug": "docs/api", "title": "API 문서", "isPublic": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+  ]
+}
+```
+비인증 요청은 공개 문서만 반환합니다.
+
+#### 문서 조회
+
+```
+GET /api/pages/:slug
+```
+
+응답 `200`:
+```json
+{
+  "page": {
+    "slug": "index",
+    "title": "홈",
+    "content": "---\ntitle: 홈\npublic: true\n---\n환영합니다!",
+    "isPublic": true,
+    "updatedAt": "2026-06-29T12:00:00.000Z"
+  }
+}
+```
+
+응답 `301` (리다이렉트):
+```json
+{ "redirect": "new-slug" }
+```
+
+응답 `404`: `{ "error": "Not found" }`
+
+비인증 요청은 비공개 문서에 대해 404를 반환합니다.
+
+#### 문서 생성/수정
+
+```
+POST /api/pages/:slug
+Content-Type: application/json
+Authorization: Bearer <api-key>
+
+{ "content": "---\ntitle: 내 페이지\npublic: true\n---\n안녕하세요" }
+```
+
+응답 `200`:
+```json
+{ "slug": "my-page", "title": "내 페이지", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+```
+
+슬러그가 없으면 생성, 있으면 수정합니다. `content`는 전체 문서 본문(frontmatter + 마크다운)이어야 합니다.
+
+#### 문서 이름 변경
+
+```
+PATCH /api/pages/:slug
+Content-Type: application/json
+Authorization: Bearer <api-key>
+
+{ "slug": "new-slug" }
+```
+
+응답 `200`:
+```json
+{ "slug": "new-slug", "title": "내 페이지", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+```
+
+응답 `409`: `{ "error": "Not found or target slug already exists" }`
+
+이전 슬러그에서 새 슬러그로 리다이렉트가 자동 생성됩니다.
+
+#### 문서 삭제
+
+```
+DELETE /api/pages/:slug
+Authorization: Bearer <api-key>
+```
+
+응답 `200`: `{ "ok": true }`
+
+응답 `404`: `{ "error": "Not found" }`
+
+### 검색
+
+```
+GET /api/search?q=키워드
+```
+
+응답 `200`:
+```json
+{
+  "results": [
+    { "slug": "index", "title": "홈", "snippet": "<mark>위키</mark>에 오신 것을 환영합니다" }
+  ]
+}
+```
+
+`q`가 없으면 빈 결과를 반환합니다. 비인증 요청은 공개 문서만 검색합니다.
+
+### 사이트맵
+
+```
+GET /api/sitemap
+```
+
+응답 `200`:
+```json
+{
+  "tree": [
+    { "slug": "index", "children": [] },
+    { "slug": "docs", "children": [
+      { "slug": "docs/api", "children": [] }
+    ] }
+  ]
+}
+```
+
+모든 문서의 계층 트리입니다. 비인증 요청은 공개 문서만 포함합니다.
+
+### 헬스체크
+
+```
+GET /api/health
+```
+
+응답 `200`: `{ "ok": true }`
+
+인증 불필요.
+
+### 슬러그 규칙
+
+- 선행/후행 `/` 금지
+- `..` 세그먼트 금지
+- `tech/web/http` 형태로 계층 구조 생성
+- 슬러그 변경 시 `redirects.json`에 리다이렉트 자동 추적
 
 ## 개발
 
