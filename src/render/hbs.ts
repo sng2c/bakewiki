@@ -17,10 +17,10 @@ const TEMPLATES: Record<string, string> = {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5/lib/codemirror.min.css">
 <style>
 main.container { max-width: 800px; }
 nav.container-fluid { flex-wrap: wrap; }
+textarea[name="content"] { min-height: 320px; font-family: monospace; }
 article { padding: 1rem; margin-top: 1rem; }
 article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
@@ -28,14 +28,7 @@ article > :last-child { margin-bottom: 0; }
 .page-header nav[aria-label="breadcrumb"] { margin:0; }
 .editor-split { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
 @media (max-width:768px) { .editor-split { grid-template-columns:1fr; } }
-.editor-split .CodeMirror { height: 320px; font-family: monospace; background: var(--pico-card-background-color, #f8f8f8); border: 1px solid var(--pico-muted-border-color, #ccc); border-radius: var(--pico-border-radius, 0.25rem); color: var(--pico-color, #222); }
-.editor-split .CodeMirror .cm-header { color: var(--pico-primary, #2563eb); font-weight: bold; }
-.editor-split .CodeMirror .cm-strong { font-weight: bold; }
-.editor-split .CodeMirror .cm-em { font-style: italic; }
-.editor-split .CodeMirror .cm-link { color: var(--pico-primary, #2563eb); }
-.editor-split .CodeMirror .cm-url { color: var(--pico-muted-color, #999); }
-.editor-split .CodeMirror .cm-comment { color: var(--pico-muted-color, #999); }
-.preview-pane { border:1px solid var(--pico-muted-border-color,#ccc); border-radius:var(--pico-border-radius,0.25rem); padding:1rem; height:320px; overflow:auto; background:var(--pico-card-background-color,#f8f8f8); }
+.preview-pane { border:1px solid var(--pico-muted-border-color,#ccc); border-radius:var(--pico-border-radius,0.25rem); padding:1rem; min-height:320px; overflow:auto; background:var(--pico-card-background-color,#f8f8f8); }
 </style>
 </head>
 <body>
@@ -54,10 +47,6 @@ article > :last-child { margin-bottom: 0; }
 {{/if}}
 </ul>
 </nav>
-{{#if needsEditor}}
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5/lib/codemirror.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5/mode/markdown/markdown.min.js"></script>
-{{/if}}
 <main class="container">
 {{{body}}}
 </main>
@@ -152,41 +141,55 @@ article > :last-child { margin-bottom: 0; }
 <div class="preview-pane" id="editor-preview"></div>
 </div>
 </div>
-<div>
-<button type="submit">Save</button>
-{{#if page}}<a href="/pages/{{page.slug}}" class="secondary">cancel</a>{{/if}}
-</div>
 </form>
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/contrib/auto-render.min.js"></script>
 <script>
 (function(){
-  var pv = document.getElementById('editor-preview');
-  var title = document.querySelector('input[name=title]');
-  var slug = document.querySelector('input[name=slug]');
+  var md = markdownit({ html:true, linkify:true, typographer:false, highlight:function(str,lang){
+    if(lang&&hljs.getLanguage(lang)){try{return '<pre class="hljs"><code>'+hljs.highlight(str,{language:lang}).value+'</code></pre>';}catch(e){}}
+    return '<pre class="hljs"><code>'+md.utils.escapeHtml(str)+'</code></pre>';
+  }});
+  // 링크 해석: 절대 경로 → /pages 접두사, 상대 경로 → 슬러그 기준 해석
+  var currentSlug='';
+  var defaultNormalizeLink=md.normalizeLink.bind(md);
+  md.normalizeLink=function(url){
+    if(url.startsWith('/')&&!url.startsWith('//')) return defaultNormalizeLink('/pages'+url);
+    if(url.startsWith('#')) return defaultNormalizeLink(url);
+    if(/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
+    if(currentSlug){
+      var parts=currentSlug.split('/').concat(url.split('/'));
+      var resolved=[];
+      for(var i=0;i<parts.length;i++){
+        if(parts[i]==='..'){if(resolved.length>0)resolved.pop();}
+        else if(parts[i]!=='.'&&parts[i]!=='')resolved.push(parts[i]);
+      }
+      return defaultNormalizeLink('/pages/'+resolved.join('/'));
+    }
+    return defaultNormalizeLink(url);
+  };
+  var ta=document.getElementById('editor-content');
+  var pv=document.getElementById('editor-preview');
+  var title=document.querySelector('input[name=title]');
+  var slug=document.querySelector('input[name=slug]');
   var timer;
-  var cm;
-  var ta = document.getElementById('editor-content');
-  if (typeof CodeMirror !== 'undefined') {
-    cm = CodeMirror.fromTextArea(ta, { mode:'markdown', lineWrapping:true });
-    cm.on('change', debounce);
-  } else {
-    ta.addEventListener('input', debounce);
-  }
-  if(title) title.addEventListener('input', debounce);
   function update(){
-    var t = title ? title.value : '';
-    var s = slug ? slug.value : '';
-    var val = cm ? cm.getValue() : ta.value;
-    var c = '# ' + t + '\\n\\n' + val;
-    fetch('/api/render', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      credentials:'same-origin',
-      body:JSON.stringify({content:c,slug:s})
-    }).then(function(r){return r.json()}).then(function(d){
-      if(d.html) pv.innerHTML=d.html;
-    }).catch(function(e){console.error('render error:',e)});
+    currentSlug=slug?slug.value:'';
+    var t=title?title.value:'';
+    var c='# '+t+'\\n\\n'+ta.value;
+    pv.innerHTML=md.render(c);
+    renderMathInElement(pv,{delimiters:[
+      {left:'$$',right:'$$',display:true},
+      {left:'$',right:'$',display:false},
+      {left:'\\(',right:'\\)',display:false},
+      {left:'\\[',right:'\\]',display:true}
+    ]});
   }
   function debounce(){clearTimeout(timer);timer=setTimeout(update,400);}
+  ta.addEventListener('input',debounce);
+  if(title)title.addEventListener('input',debounce);
   update();
 })();
 </script>`,

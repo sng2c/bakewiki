@@ -13,7 +13,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 	app.get("/edit", requireAuth, (c) => {
 		return c.html(renderTemplate("editor", {
 			page: null, slug: "", title: "", public: true, body: "",
-		}, { title: "New page", user: true, q: "", needsEditor: true }));
+		}, { title: "New page", user: true, q: "" }));
 	});
 
 	// /edit/:slug{.+} → 기존 문서 편집
@@ -24,7 +24,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		if (!page) {
 			return c.html(renderTemplate("editor", {
 				page: null, slug, title: "", public: true, body: "",
-			}, { title: "New page", user: true, q: "", needsEditor: true }));
+			}, { title: "New page", user: true, q: "" }));
 		}
 		const doc = parseDocument(page.content);
 		return c.html(renderTemplate("editor", {
@@ -32,7 +32,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 			title: extractTitle(doc) ?? "",
 			public: extractPublic(doc),
 			body: doc.body,
-		}, { title: `Edit: ${page.title}`, user: true, q: "", needsEditor: true }));
+		}, { title: `Edit: ${page.title}`, user: true, q: "" }));
 	});
 
 	// 저장 (POST /edit). title/public/content를 분리된 폼 필드에서 받음.
