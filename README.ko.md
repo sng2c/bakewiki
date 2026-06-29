@@ -139,16 +139,6 @@ public: true
 
 인증: `Authorization: Bearer <api-key>` 헤더 또는 세션 쿠키.
 
-## 로깅
-
-서버는 요청 로그를 stdout에 출력합니다:
-
-```
-GET / 200 16ms
-GET /pages 200 11ms
-GET /nonexistent 404 0ms
-```
-
 ## 개발
 
 ```bash

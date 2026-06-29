@@ -132,16 +132,6 @@ Page content...
 
 Auth: `Authorization: Bearer <api-key>` header or session cookie.
 
-## Logging
-
-The server prints request logs to stdout:
-
-```
-GET / 200 16ms
-GET /pages 200 11ms
-GET /nonexistent 404 0ms
-```
-
 ## Development
 
 ```bash

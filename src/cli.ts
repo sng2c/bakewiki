@@ -32,9 +32,6 @@ Serve options:
   --host <addr>     Bind address (default: 127.0.0.1, env: BAKEWIKI_HOST)
   --port <number>   Port number (default: 3000, env: BAKEWIKI_PORT)
 
-Logging:
-  Request logs are printed to stdout (METHOD PATH STATUS TIMEms)
-
 Remote commands:
   list [options]                             List pages
   get <slug> [options]                           Get page content

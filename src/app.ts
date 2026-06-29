@@ -21,17 +21,6 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 	});
 	app.use("*", auth);
 
-	// 접근 로그
-	app.use("*", async (c, next) => {
-		const start = Date.now();
-		await next();
-		const ms = Date.now() - start;
-		const status = c.res.status;
-		const method = c.req.method;
-		const path = c.req.path;
-		console.log(`${method} ${path} ${status} ${ms}ms`);
-	});
-
 	// 헬스체크
 	app.get("/api/health", (c) => c.json({ ok: true }));
 
