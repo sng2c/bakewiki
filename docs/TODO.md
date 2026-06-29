@@ -63,4 +63,4 @@
 - [ ] 검색 API 고도화 (페이지네이션, 필터)
 - [ ] 다크 모드 토글 (Pico CSS data-theme)
 - [ ] 빈 문서 생성 허용 (slug만으로 생성 가능, title/body 없어도 됨)
-- [ ] 비공개 상속: 상위 슬러그가 private이면 하위 문서도 강제 private
+- [ ] 비공개 상속: 조상 중 하나라도 private이면 강제 private
