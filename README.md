@@ -4,10 +4,10 @@
 
 ## 특징
 
-- **GFM 마크다운** — GitHub Flavored Markdown으로 작성, 코드 하이라이팅·수식(KaTeX) 지원
-- **클라이언트 렌더링** — 페이지 조회와 에디터 프리뷰 모두 브라우저에서 렌더링 (markdown-it + highlight.js + KaTeX)
+- **GFM 마크다운** — GitHub Flavored Markdown, 코드 하이라이팅·수식(KaTeX) 지원
+- **클라이언트 렌더링** — 페이지 조회와 에디터 프리뷰 모두 브라우저에서 렌더링
 - **파일시스템 기반** — 페이지는 `.md` 파일, Git으로 버전 관리 가능
-- **계층 슬러그** — `tech/web/http` 형태의 경로, 상대 링크(`./hehe`, `../css`) 지원
+- **계층 슬러그** — `tech/web/http` 형태 경로, 상대 링크(`./hehe`, `../css`) 지원
 - **인증** — 관리자 로그인, 세션 쿠키 + API 키 인증
 - **리다이렉트** — 슬러그 변경 시 자동 리다이렉트 매핑
 - **LLM 친화** — 구조화된 JSON API, API 키 인증
@@ -22,37 +22,36 @@ npx @sng2c/bakewiki serve --data ./data
 
 브라우저에서 http://127.0.0.1:3000 열기.
 
-## CLI 명령
+## CLI
+
+```bash
+bakewiki [options] <command> [command options]
+```
 
 ### 글로벌 옵션
 
-```
-bakewiki [global options] <command> [command options]
+| 옵션 | 설명 | 환경변수 |
+|------|------|----------|
+| `--data <path>` | 데이터 디렉토리 (로컬 명령에 필수) | `BAKEWIKI_DATA_DIR` |
+| `--version, -v` | 버전 출력 | |
+| `--help, -h` | 도움말 출력 | |
 
-Global options:
-  --data <path>    Data directory (required for local commands, env: BAKEWIKI_DATA_DIR)
-  --version, -v    Show version
-  --help, -h       Show help
-```
-
-### 로컬 (서버 관리)
+### 로컬 명령
 
 | 명령 | 설명 |
 |------|------|
-| `init --data <path>` | 데이터 디렉토리 초기화 |
-| `admin create --data <path>` | 관리자 계정 생성 |
-| `serve --data <path>` | HTTP 서버 시작 |
-| `import <dir> --data <path>` | 마크다운 폴더 가져오기 |
-| `export <dir> --data <path>` | 위키를 마크다운 폴더로 내보내기 |
+| `init` | 데이터 디렉토리 초기화 |
+| `admin create` | 관리자 계정 생성 |
+| `serve` | HTTP 서버 시작 |
+| `import <dir>` | 마크다운 폴더 가져오기 |
+| `export <dir>` | 위키를 마크다운 폴더로 내보내기 |
 
-### 원격 (API)
+Serve 옵션: `--host <addr>` (기본값: `127.0.0.1`), `--port <number>` (기본값: `3000`)
+
+### 원격 명령
 
 ```bash
-bakewiki remote [options] <command>
-
-Options (--url, --key can go before or after the subcommand):
-  --url <url>      Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
-  --key <apikey>   API key (env: BAKEWIKI_API_KEY)
+bakewiki remote [--url <url>] [--key <key>] <command>
 ```
 
 | 명령 | 설명 | 인증 |
@@ -67,6 +66,15 @@ Options (--url, --key can go before or after the subcommand):
 | `health` | 헬스체크 | 없음 |
 
 *비인증도 동작하지만 비공개 문서는 인증 필요
+
+원격 옵션: `--url <url>` (기본값: `http://127.0.0.1:3000`), `--key <apikey>` (`BAKEWIKI_API_KEY`)
+
+```bash
+# 옵션은 서브커맨드 앞뒤 모두 가능
+bakewiki remote --key bk_xxx list
+bakewiki remote list --key bk_xxx
+bakewiki remote --url http://... --key bk_xxx get index
+```
 
 ### 환경변수
 
@@ -84,7 +92,7 @@ Options (--url, --key can go before or after the subcommand):
 
 ```
 data/
-├── pages/           ← .md 파일 (콘텐츠)
+├── pages/           ← .md 파일
 │   ├── index.md
 │   └── index/
 │       └── hehe.md
@@ -103,14 +111,12 @@ public: true
 본문 내용...
 ```
 
-`title`과 `public`은 프론트매터에서 분리되어 에디터의 별도 필드로 편집됩니다.
-
 ## API
 
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
 | `GET` | `/api/pages` | 문서 목록 | 선택 |
-| `GET` | `/api/pages/:slug` | 문서 조회 (리다이렉트 포함) | 선택 |
+| `GET` | `/api/pages/:slug` | 문서 조회 | 선택 |
 | `POST` | `/api/pages/:slug` | 문서 생성/수정 | 필요 |
 | `PATCH` | `/api/pages/:slug` | 문서 이름 변경 | 필요 |
 | `DELETE` | `/api/pages/:slug` | 문서 삭제 | 필요 |
