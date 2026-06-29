@@ -15,7 +15,9 @@
   "bin": {
     "bakewiki": "dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -24,7 +26,9 @@
     "init": "tsx src/cli.ts init --data ./data",
     "serve": "tsx src/cli.ts serve --data ./data",
     "admin:create": "tsx src/cli.ts admin create --data ./data",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "cp README.en.md README.md.en-ko-bak && cp README.en.md README.md",
+    "postpublish": "mv README.md.en-ko-bak README.md"
   },
   "dependencies": {
     "@hono/node-server": "2.0.6",

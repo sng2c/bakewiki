@@ -18,6 +18,9 @@ data/
 .env.*
 !.env.example
 
+# Temp
+README.md.en-ko-bak
+
 # Logs
 *.log
 npm-debug.log*
