@@ -7,7 +7,7 @@ import { importCommand } from "./cli/import.js";
 import { exportCommand } from "./cli/export.js";
 import { remoteCommand, extractRemoteOpts } from "./cli/pages.js";
 
-const VERSION = "0.0.4";
+const VERSION = "0.0.5";
 
 function help(): void {
 	console.log(`bakewiki ${VERSION}

@@ -24,6 +24,17 @@ npx @sng2c/bakewiki serve --data ./data
 
 ## CLI 명령
 
+### 글로벌 옵션
+
+```
+bakewiki [global options] <command> [command options]
+
+Global options:
+  --data <path>    Data directory (required for local commands, env: BAKEWIKI_DATA_DIR)
+  --version, -v    Show version
+  --help, -h       Show help
+```
+
 ### 로컬 (서버 관리)
 
 | 명령 | 설명 |
@@ -36,22 +47,26 @@ npx @sng2c/bakewiki serve --data ./data
 
 ### 원격 (API)
 
+```bash
+bakewiki remote [options] <command>
+
+Options (--url, --key can go before or after the subcommand):
+  --url <url>      Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
+  --key <apikey>   API key (env: BAKEWIKI_API_KEY)
+```
+
 | 명령 | 설명 | 인증 |
 |------|------|------|
-| `remote list` | 문서 목록 | 필요 |
-| `remote get <slug>` | 문서 조회 | 필요 |
-| `remote create <slug> <file>` | 문서 생성/수정 | 필요 |
-| `remote rename <old> <new>` | 문서 이름 변경 | 필요 |
-| `remote delete <slug>` | 문서 삭제 | 필요 |
-| `remote search <query>` | 검색 | 선택* |
-| `remote sitemap` | 페이지 트리 | 선택* |
-| `remote health` | 헬스체크 | 없음 |
+| `list` | 문서 목록 | 필요 |
+| `get <slug>` | 문서 조회 | 필요 |
+| `create <slug> <file>` | 문서 생성/수정 | 필요 |
+| `rename <old> <new>` | 문서 이름 변경 | 필요 |
+| `delete <slug>` | 문서 삭제 | 필요 |
+| `search <query>` | 검색 | 선택* |
+| `sitemap` | 페이지 트리 | 선택* |
+| `health` | 헬스체크 | 없음 |
 
 *비인증도 동작하지만 비공개 문서는 인증 필요
-
-원격 옵션:
-- `--url <url>` — 서버 URL (기본값: `http://127.0.0.1:3000`, 환경변수: `BAKEWIKI_URL`)
-- `--key <apikey>` — API 키 (환경변수: `BAKEWIKI_API_KEY`)
 
 ### 환경변수
 
