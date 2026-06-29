@@ -1,5 +1,7 @@
 # @sng2c/bakewiki
 
+[![npm version](https://img.shields.io/npm/v/@sng2c/bakewiki?label=npm)](https://www.npmjs.com/package/@sng2c/bakewiki) [![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](https://github.com/sng2c/bakewiki)
+
 오픈소스 GFM 위키. 인간과 LLM 모두를 위한 지식 관리.
 
 ## 특징
@@ -136,6 +138,16 @@ public: true
 | `GET` | `/api/health` | 헬스체크 | 없음 |
 
 인증: `Authorization: Bearer <api-key>` 헤더 또는 세션 쿠키.
+
+## 로깅
+
+서버는 요청 로그를 stdout에 출력합니다:
+
+```
+GET / 200 16ms
+GET /pages 200 11ms
+GET /nonexistent 404 0ms
+```
 
 ## 개발
 

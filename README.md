@@ -1,5 +1,7 @@
 # @sng2c/bakewiki
 
+[![npm version](https://img.shields.io/npm/v/@sng2c/bakewiki?label=npm)](https://www.npmjs.com/package/@sng2c/bakewiki) [![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](https://github.com/sng2c/bakewiki)
+
 An open-source GFM wiki for humans and LLMs.
 
 ## Features
@@ -129,6 +131,16 @@ Page content...
 | `GET` | `/api/health` | Health check | None |
 
 Auth: `Authorization: Bearer <api-key>` header or session cookie.
+
+## Logging
+
+The server prints request logs to stdout:
+
+```
+GET / 200 16ms
+GET /pages 200 11ms
+GET /nonexistent 404 0ms
+```
 
 ## Development
 

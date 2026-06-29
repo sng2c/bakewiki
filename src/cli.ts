@@ -7,7 +7,7 @@ import { importCommand } from "./cli/import.js";
 import { exportCommand } from "./cli/export.js";
 import { remoteCommand, extractRemoteOpts } from "./cli/pages.js";
 
-const VERSION = "0.0.5";
+const VERSION = "0.0.6";
 
 function help(): void {
 	console.log(`bakewiki ${VERSION}
@@ -31,6 +31,9 @@ Commands:
 Serve options:
   --host <addr>     Bind address (default: 127.0.0.1, env: BAKEWIKI_HOST)
   --port <number>   Port number (default: 3000, env: BAKEWIKI_PORT)
+
+Logging:
+  Request logs are printed to stdout (METHOD PATH STATUS TIMEms)
 
 Remote commands:
   list [options]                             List pages
