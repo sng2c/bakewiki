@@ -2,11 +2,9 @@ import { Hono } from "hono";
 import type { Store } from "./env.js";
 import type { AuthUser } from "./env.js";
 import { auth } from "./auth/middleware.js";
-import { requireAuth } from "./auth/middleware.js";
 import { authRoutes } from "./auth/routes.js";
 import { pageRoutes } from "./pages/routes.js";
 import { searchPages } from "./pages/search.js";
-import { renderMarkdown } from "./render/markdown.js";
 import { listPages } from "./pages/store.js";
 import { webReadRoutes } from "./web/read.js";
 import { webAuthRoutes } from "./web/auth.js";
@@ -31,18 +29,6 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 
 	// 문서 API
 	app.route("/api/pages", pageRoutes());
-
-	// 렌더 프리뷰 (POST /api/render). 관리자 전용.
-	app.post("/api/render", requireAuth, async (c) => {
-		const body = await c.req.json().catch(() => null);
-		const content = body?.content;
-		const slug = body?.slug;
-		if (typeof content !== "string") {
-			return c.json({ error: "content (string) is required" }, 400);
-		}
-		const html = renderMarkdown(content, typeof slug === "string" ? slug : undefined);
-		return c.json({ html });
-	});
 
 	// 검색 API (SPEC: /api/search)
 	app.get("/api/search", async (c) => {
