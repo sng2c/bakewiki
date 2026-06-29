@@ -7,6 +7,31 @@ Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 // 템플릿 컴파일 캐시 (이름 → 컴파일된 함수)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
 
+const RENDER_SCRIPTS = `
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/contrib/auto-render.min.js"></script>`;
+
+const LINK_RESOLVE = `
+var defaultNormalizeLink=md.normalizeLink.bind(md);
+md.normalizeLink=function(url){
+if(url.startsWith('/')&&!url.startsWith('//'))return defaultNormalizeLink('/pages'+url);
+if(url.startsWith('#'))return defaultNormalizeLink(url);
+if(/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url))return defaultNormalizeLink(url);
+var base=typeof slug!=='undefined'?slug:d.slug;
+if(base){var parts=base.split('/').concat(url.split('/'));var resolved=[];for(var i=0;i<parts.length;i++){if(parts[i]==='..'){if(resolved.length>0)resolved.pop();}else if(parts[i]!=='.'&&parts[i]!=='')resolved.push(parts[i]);}return defaultNormalizeLink('/pages/'+resolved.join('/'));}
+return defaultNormalizeLink(url);
+};`;
+
+const KATEX_RENDER = `
+renderMathInElement(el,{delimiters:[
+{left:'$$',right:'$$',display:true},
+{left:'$',right:'$',display:false},
+{left:'\\\\(',right:'\\\\)',display:false},
+{left:'\\\\[',right:'\\\\]',display:true}
+]});`;
+
 const TEMPLATES: Record<string, string> = {
 	layout: `<!DOCTYPE html>
 <html lang="ko">
@@ -47,9 +72,30 @@ article > :last-child { margin-bottom: 0; }
 {{/if}}
 </ul>
 </nav>
+{{#if needsRender}}
+${RENDER_SCRIPTS}
+{{/if}}
+{{#if needsPageRender}}
+${RENDER_SCRIPTS}
+{{/if}}
 <main class="container">
 {{{body}}}
 </main>
+{{#if needsPageRender}}
+<script>
+(function(){
+var d=JSON.parse(document.getElementById('page-data').textContent);
+var el=document.getElementById('page-content');
+var md=markdownit({html:true,linkify:true,typographer:false,highlight:function(str,lang){
+if(lang&&hljs.getLanguage(lang)){try{return '<pre class="hljs"><code>'+hljs.highlight(str,{language:lang}).value+'</code></pre>';}catch(e){}}
+return '<pre class="hljs"><code>'+md.utils.escapeHtml(str)+'</code></pre>';
+}});
+${LINK_RESOLVE.replace(/typeof slug!=='undefined'\?slug:/g, '')}
+el.innerHTML=md.render('# '+d.title+'\\n\\n'+d.body);
+${KATEX_RENDER}
+})();
+</script>
+{{/if}}
 </body>
 </html>`,
 
@@ -61,12 +107,11 @@ article > :last-child { margin-bottom: 0; }
 </ul></nav>
 <small>{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
 </div>
-<article>
-{{{html}}}
-</article>
+<article id="page-content"></article>
 {{#if user}}
 <p><a href="/edit/{{page.slug}}" role="button">Edit</a></p>
-{{/if}}`,
+{{/if}}
+<script id="page-data" type="application/json">{{{pageData}}}</script>`,
 
 	list: `<h1>All pages</h1>
 <ul>
@@ -142,55 +187,30 @@ article > :last-child { margin-bottom: 0; }
 </div>
 </div>
 </form>
-<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/highlight.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/contrib/auto-render.min.js"></script>
 <script>
 (function(){
-  var md = markdownit({ html:true, linkify:true, typographer:false, highlight:function(str,lang){
-    if(lang&&hljs.getLanguage(lang)){try{return '<pre class="hljs"><code>'+hljs.highlight(str,{language:lang}).value+'</code></pre>';}catch(e){}}
-    return '<pre class="hljs"><code>'+md.utils.escapeHtml(str)+'</code></pre>';
-  }});
-  // 링크 해석: 절대 경로 → /pages 접두사, 상대 경로 → 슬러그 기준 해석
-  var currentSlug='';
-  var defaultNormalizeLink=md.normalizeLink.bind(md);
-  md.normalizeLink=function(url){
-    if(url.startsWith('/')&&!url.startsWith('//')) return defaultNormalizeLink('/pages'+url);
-    if(url.startsWith('#')) return defaultNormalizeLink(url);
-    if(/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
-    if(currentSlug){
-      var parts=currentSlug.split('/').concat(url.split('/'));
-      var resolved=[];
-      for(var i=0;i<parts.length;i++){
-        if(parts[i]==='..'){if(resolved.length>0)resolved.pop();}
-        else if(parts[i]!=='.'&&parts[i]!=='')resolved.push(parts[i]);
-      }
-      return defaultNormalizeLink('/pages/'+resolved.join('/'));
-    }
-    return defaultNormalizeLink(url);
-  };
-  var ta=document.getElementById('editor-content');
-  var pv=document.getElementById('editor-preview');
-  var title=document.querySelector('input[name=title]');
-  var slug=document.querySelector('input[name=slug]');
-  var timer;
-  function update(){
-    currentSlug=slug?slug.value:'';
-    var t=title?title.value:'';
-    var c='# '+t+'\\n\\n'+ta.value;
-    pv.innerHTML=md.render(c);
-    renderMathInElement(pv,{delimiters:[
-      {left:'$$',right:'$$',display:true},
-      {left:'$',right:'$',display:false},
-      {left:'\\(',right:'\\)',display:false},
-      {left:'\\[',right:'\\]',display:true}
-    ]});
-  }
-  function debounce(){clearTimeout(timer);timer=setTimeout(update,400);}
-  ta.addEventListener('input',debounce);
-  if(title)title.addEventListener('input',debounce);
-  update();
+var md=markdownit({html:true,linkify:true,typographer:false,highlight:function(str,lang){
+if(lang&&hljs.getLanguage(lang)){try{return '<pre class="hljs"><code>'+hljs.highlight(str,{language:lang}).value+'</code></pre>';}catch(e){}}
+return '<pre class="hljs"><code>'+md.utils.escapeHtml(str)+'</code></pre>';
+}});
+var slug=document.querySelector('input[name=slug]');
+var currentSlug='';
+${LINK_RESOLVE.replace(/typeof slug!=='undefined'\?slug:/g, 'slug?slug.value:')}
+var ta=document.getElementById('editor-content');
+var pv=document.getElementById('editor-preview');
+var title=document.querySelector('input[name=title]');
+var timer;
+function update(){
+currentSlug=slug?slug.value:'';
+var t=title?title.value:'';
+var c='# '+t+'\\n\\n'+ta.value;
+pv.innerHTML=md.render(c);
+${KATEX_RENDER.replace(/el/g, 'pv')}
+}
+function debounce(){clearTimeout(timer);timer=setTimeout(update,400);}
+ta.addEventListener('input',debounce);
+if(title)title.addEventListener('input',debounce);
+update();
 })();
 </script>`,
 

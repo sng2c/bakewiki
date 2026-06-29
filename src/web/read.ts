@@ -5,7 +5,6 @@ import { getPage, listPages } from "../pages/store.js";
 import { searchPages } from "../pages/search.js";
 import { readRedirects } from "../data.js";
 import { parseDocument, extractTitle } from "../pages/frontmatter.js";
-import { renderMarkdown } from "../render/markdown.js";
 import { renderTemplate } from "../render/hbs.js";
 
 // 슬러그에서 breadcrumb 항목 생성. 모든 페이지에 표시.
@@ -27,22 +26,24 @@ function buildBreadcrumb(slug: string) {
 	return items;
 }
 
-// 공통: 단일 페이지를 HTML로 렌더링. 없거나 권한 없으면 null.
+// 공통: 단일 페이지를 렌더링. 없거나 권한 없으면 null.
 async function renderPage(store: Store, slug: string, authed: boolean): Promise<string | null> {
 	const page = await getPage(store, slug);
 	if (!page) return null;
 	if (!page.isPublic && !authed) return null;
 	const doc = parseDocument(page.content);
 	const title = extractTitle(doc) ?? page.slug;
-	const html = renderMarkdown(`# ${title}\n\n${doc.body}`, slug);
 	const breadcrumb = buildBreadcrumb(slug);
 	const view = {
 		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
-		html,
 		breadcrumb,
+		body: doc.body,
+		title,
+		slug,
 		user: authed,
+		pageData: JSON.stringify({ title, slug, body: doc.body }),
 	};
-	return renderTemplate("page", view, { title: page.title, user: authed, q: "" });
+	return renderTemplate("page", view, { title: page.title, user: authed, q: "", needsPageRender: true });
 }
 
 // 공통: 리다이렉트 조회. 있으면 301 리다이렉트, 없으면 null.
