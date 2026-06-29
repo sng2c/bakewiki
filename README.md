@@ -78,15 +78,26 @@ bakewiki remote --url http://... --key bk_xxx get index
 
 ### 환경변수
 
-| 변수 | 설명 |
-|------|------|
-| `BAKEWIKI_DATA_DIR` | 데이터 디렉토리 (`--data` 대체) |
-| `BAKEWIKI_HOST` | 바인드 주소 (기본값: `127.0.0.1`) |
-| `BAKEWIKI_PORT` | 포트 (기본값: `3000`) |
-| `BAKEWIKI_URL` | 원격 명령용 서버 URL |
-| `BAKEWIKI_API_KEY` | 원격 명령용 API 키 |
-| `BAKEWIKI_ADMIN_EMAIL` | 비대화형 관리자 생성 이메일 |
-| `BAKEWIKI_ADMIN_PASSWORD` | 비대화형 관리자 생성 비밀번호 |
+프로젝트 루트에 `.env` 파일을 두면 `dotenv`가 자동 로드합니다. `.env.example`을 참고하세요.
+
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `BAKEWIKI_DATA_DIR` | 데이터 디렉토리 (`--data` 대체) | 필수 |
+| `BAKEWIKI_HOST` | 바인드 주소 | `127.0.0.1` |
+| `BAKEWIKI_PORT` | 포트 | `3000` |
+| `BAKEWIKI_URL` | 원격 명령용 서버 URL | `http://127.0.0.1:3000` |
+| `BAKEWIKI_API_KEY` | 원격 명령용 API 키 | |
+| `BAKEWIKI_ADMIN_EMAIL` | 비대화형 관리자 생성 이메일 | |
+| `BAKEWIKI_ADMIN_PASSWORD` | 비대화형 관리자 생성 비밀번호 | |
+
+```bash
+# .env 예시
+BAKEWIKI_DATA_DIR=./data
+BAKEWIKI_PORT=3000
+BAKEWIKI_HOST=127.0.0.1
+BAKEWIKI_URL=http://127.0.0.1:3000
+BAKEWIKI_API_KEY=bk_xxx
+```
 
 ## 데이터 구조
 
