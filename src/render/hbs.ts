@@ -1,5 +1,16 @@
 import Handlebars from "handlebars";
 
+// CDN 버전 관리 — 여기서 한 번에 수정
+const CDN = {
+	pico: "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css",
+	hljs_css: "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css",
+	hljs_js: "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js",
+	katex_css: "https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css",
+	katex_js: "https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js",
+	katex_auto: "https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/contrib/auto-render.min.js",
+	markdownit: "https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js",
+};
+
 // 헬퍼 등록
 Handlebars.registerHelper("eq", (a, b) => a === b);
 Handlebars.registerHelper("json", (v) => JSON.stringify(v));
@@ -8,10 +19,10 @@ Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 const cache = new Map<string, HandlebarsTemplateDelegate>();
 
 const RENDER_SCRIPTS = `
-<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/highlight.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/contrib/auto-render.min.js"></script>`;
+<script src="${CDN.markdownit}"></script>
+<script src="${CDN.hljs_js}"></script>
+<script src="${CDN.katex_js}"></script>
+<script src="${CDN.katex_auto}"></script>`;
 
 const LINK_RESOLVE = `
 var defaultNormalizeLink=md.normalizeLink.bind(md);
@@ -20,7 +31,7 @@ if(url.startsWith('/')&&!url.startsWith('//'))return defaultNormalizeLink('/page
 if(url.startsWith('#'))return defaultNormalizeLink(url);
 if(/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url))return defaultNormalizeLink(url);
 var base=typeof slug!=='undefined'?slug:d.slug;
-if(base){var parts=base.split('/').concat(url.split('/'));var resolved=[];for(var i=0;i<parts.length;i++){if(parts[i]==='..'){if(resolved.length>0)resolved.pop();}else if(parts[i]!=='.'&&parts[i]!=='')resolved.push(parts[i]);}return defaultNormalizeLink('/pages/'+resolved.join('/'));}
+if(base){var parts=base.split('/').concat(url.split('/'));var resolved=[];for(var i=0;i<parts.length;i++){if(parts[i]==='..'){if(resolved.length>0)resolved.pop();}else if(parts[i]!=='.'&&parts[i]!=='')resolved.push(parts[i]);}return defaultNormalizeLink('/pages'+resolved.join('/'));}
 return defaultNormalizeLink(url);
 };`;
 
@@ -39,9 +50,9 @@ const TEMPLATES: Record<string, string> = {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{title}}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css">
+<link rel="stylesheet" href="${CDN.pico}">
+<link rel="stylesheet" href="${CDN.hljs_css}">
+<link rel="stylesheet" href="${CDN.katex_css}">
 <style>
 main.container { max-width: 800px; }
 nav.container-fluid { flex-wrap: wrap; }
