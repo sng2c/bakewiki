@@ -64,3 +64,4 @@
 - [ ] 다크 모드 토글 (Pico CSS data-theme)
 - [ ] 빈 문서 생성 허용 (slug만으로 생성 가능, title/body 없어도 됨)
 - [ ] 비공개 상속: 조상 중 하나라도 private이면 강제 private
+- [ ] 페이지 목록을 슬러그 기반 디렉토리 트리로 표현
