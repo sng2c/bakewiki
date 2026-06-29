@@ -133,7 +133,12 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 	upsertSearchIndex(newSlug, title, content, isPublic, updatedAt);
 
 	// 리다이렉트 등록 (oldSlug → newSlug)
+	// 순환 방지: newSlug를 가리키는 기존 리다이렉트 제거
 	const redirects = await readRedirects(store.dataDir);
+	delete redirects[newSlug]; // B → A 순환 차단
+	for (const key of Object.keys(redirects)) {
+		if (redirects[key] === newSlug) delete redirects[key]; // X → newSlug 정리
+	}
 	redirects[oldSlug] = newSlug;
 	await writeRedirects(store.dataDir, redirects);
 
