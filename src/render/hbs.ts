@@ -4,7 +4,7 @@ import Handlebars from "handlebars";
 Handlebars.registerHelper("eq", (a, b) => a === b);
 Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 
-// 템플릿 컴파일 캐시 (파일 경로 → 컴파일된 함수)
+// 템플릿 컴파일 캐시 (이름 → 컴파일된 함수)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
 
 const TEMPLATES: Record<string, string> = {
@@ -13,111 +13,202 @@ const TEMPLATES: Record<string, string> = {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{title}}{{#if site}} - {{site}}{{/if}}</title>
+<title>{{title}}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5/lib/codemirror.min.css">
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 760px; margin: 1rem auto; padding: 0 1rem; color: #222; line-height: 1.6; }
-a { color: #2563eb; }
-nav { display: flex; gap: 1rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; margin-bottom: 1.5rem; font-size: 0.9rem; }
-nav form { margin-left: auto; display: flex; gap: 0.3rem; }
-nav input[type=text] { flex: 0 0 200px; }
-pre.hljs { padding: 0.8rem; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; }
-code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em; }
-pre code { background: none; padding: 0; }
-.muted { color: #999; font-size: 0.8rem; }
-.page-meta { color: #999; font-size: 0.8rem; margin-bottom: 1rem; }
-ul.pages { list-style: none; padding: 0; }
-ul.pages li { padding: 0.3rem 0; }
-mark { background: #fef08a; }
-textarea { width: 100%; height: 400px; font-family: monospace; padding: 0.5rem; }
-.btn { display: inline-block; padding: 0.4rem 1rem; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }
-.login-form { max-width: 300px; }
-.login-form label { display: block; margin: 0.5rem 0 0.2rem; }
-.login-form input { width: 100%; padding: 0.4rem; }
+main.container { max-width: 800px; }
+nav.container-fluid { flex-wrap: wrap; }
+article { padding: 1rem; margin-top: 1rem; }
+article > :first-child { margin-top: 0; }
+article > :last-child { margin-bottom: 0; }
+.page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
+.page-header nav[aria-label="breadcrumb"] { margin:0; }
+.editor-split { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+@media (max-width:768px) { .editor-split { grid-template-columns:1fr; } }
+.editor-split .CodeMirror { height: 320px; font-family: monospace; background: var(--pico-card-background-color, #f8f8f8); border: 1px solid var(--pico-muted-border-color, #ccc); border-radius: var(--pico-border-radius, 0.25rem); color: var(--pico-color, #222); }
+.editor-split .CodeMirror .cm-header { color: var(--pico-primary, #2563eb); font-weight: bold; }
+.editor-split .CodeMirror .cm-strong { font-weight: bold; }
+.editor-split .CodeMirror .cm-em { font-style: italic; }
+.editor-split .CodeMirror .cm-link { color: var(--pico-primary, #2563eb); }
+.editor-split .CodeMirror .cm-url { color: var(--pico-muted-color, #999); }
+.editor-split .CodeMirror .cm-comment { color: var(--pico-muted-color, #999); }
+.preview-pane { border:1px solid var(--pico-muted-border-color,#ccc); border-radius:var(--pico-border-radius,0.25rem); padding:1rem; height:320px; overflow:auto; background:var(--pico-card-background-color,#f8f8f8); }
 </style>
 </head>
 <body>
-<nav>
-<a href="/">Home</a>
-<a href="/pages">Pages</a>
-<a href="/search">Search</a>
+<nav class="container-fluid">
+<ul>
+<li><a href="/"><strong>bakewiki</strong></a></li>
+</ul>
+<ul>
+<li><a href="/pages">Pages</a></li>
+<li><a href="/search">Search</a></li>
 {{#if user}}
-<a href="/edit">New</a>
-<form action="/logout" method="post" style="margin:0;display:inline">
-<button type="submit" style="background:none;border:none;color:#2563eb;cursor:pointer;padding:0;font-size:inherit">Logout</button>
-</form>
+<li><a href="/edit">New</a></li>
+<li><a href="/settings">Settings</a></li>
 {{else}}
-<a href="/login">Login</a>
+<li><a href="/login">Login</a></li>
 {{/if}}
-<form action="/search" method="get">
-<input type="text" name="q" placeholder="search..." value="{{q}}">
-<button type="submit">Go</button>
-</form>
+</ul>
 </nav>
+{{#if needsEditor}}
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5/lib/codemirror.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5/mode/markdown/markdown.min.js"></script>
+{{/if}}
+<main class="container">
 {{{body}}}
+</main>
 </body>
 </html>`,
 
-	page: `<article>
-<h1>{{page.title}}</h1>
-<div class="page-meta">{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</div>
+	page: `<div class="page-header">
+<nav aria-label="breadcrumb"><ul>
+{{#each breadcrumb}}
+<li>{{#if href}}<a href="{{href}}">{{name}}</a>{{else}}{{name}}{{/if}}</li>
+{{/each}}
+</ul></nav>
+<small>{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
+</div>
+<article>
 {{{html}}}
 </article>
 {{#if user}}
-<p style="margin-top:2rem"><a class="btn" href="/edit/{{page.slug}}">Edit</a></p>
+<p><a href="/edit/{{page.slug}}" role="button">Edit</a></p>
 {{/if}}`,
 
 	list: `<h1>All pages</h1>
-<ul class="pages">
+<ul>
 {{#each pages}}
-<li><a href="/page/{{slug}}">{{title}}</a> <span class="muted">{{slug}}{{#unless isPublic}} 🔒{{/unless}}</span></li>
+<li><a href="/pages/{{slug}}">{{title}}</a> <small>{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small></li>
 {{/each}}
 </ul>`,
 
 	search: `<h1>Search{{#if q}}: {{q}}{{/if}}</h1>
+<form action="/search" method="get">
+<input type="search" name="q" value="{{q}}" placeholder="Search pages...">
+</form>
 {{#if results}}
-<ul class="pages">
+<ul>
 {{#each results}}
-<li><a href="/page/{{slug}}">{{title}}</a><br><span class="muted">{{{snippet}}}</span></li>
+<li><a href="/pages/{{slug}}">{{title}}</a><br><small>{{{snippet}}}</small></li>
 {{/each}}
 </ul>
 {{else}}
-<p class="muted">No results.</p>
+<p><small>No results.</small></p>
 {{/if}}`,
 
-	notFound: `<h1>Not found</h1>
+	notFound: `<article>
+<h1>Not found</h1>
 <p>The page <strong>{{slug}}</strong> does not exist.</p>
-<p>
 {{#if canCreate}}
-<a class="btn" href="/edit/{{slug}}">Create this page</a>
+<a href="/edit/{{slug}}" role="button">Create this page</a>
 {{else}}
-<a href="/login">Login</a> to create it.
+<p><a href="/login">Login</a> to create it.</p>
 {{/if}}
-</p>
-<p><a href="/">Home</a></p>`,
+<p><a href="/">Home</a></p>
+</article>`,
 
-	login: `<h1>Login</h1>
-<form class="login-form" action="/login" method="post">
-<label>Email</label>
+	login: `<article>
+<h1>Login</h1>
+<form action="/login" method="post">
+<label>Email
 <input type="email" name="email" required>
-<label>Password</label>
+</label>
+<label>Password
 <input type="password" name="password" required>
-<button class="btn" type="submit">Login</button>
+</label>
+<button type="submit">Login</button>
 </form>
-{{#if error}}<p style="color:red">{{error}}</p>{{/if}}`,
+{{#if error}}<p><small style="color:red">{{error}}</small></p>{{/if}}
+</article>`,
 
 	editor: `<h1>{{#if page}}Edit: {{page.title}}{{else}}New page{{/if}}</h1>
 <form action="/edit" method="post">
-<label>Slug <span class="muted">(path, e.g. tech/web/http)</span></label>
-<input type="text" name="slug" value="{{#if page}}{{page.slug}}{{else}}{{slug}}{{/if}}" style="width:100%;padding:0.4rem;margin-bottom:0.5rem" {{#if page}}readonly{{/if}}>
-<label>Content (GFM, with YAML frontmatter)</label>
-<textarea name="content">{{#if page}}{{page.content}}{{else}}---\ntitle: \npublic: true\n---\n# \n{{/if}}</textarea>
-<div style="margin-top:0.5rem">
-<button class="btn" type="submit">Save</button>
-{{#if page}}<a href="/page/{{page.slug}}" class="muted">cancel</a>{{/if}}
+<input type="hidden" name="originalSlug" value="{{#if page}}{{page.slug}}{{/if}}">
+<label>Slug <small>(leave empty to auto-generate)</small>
+<input type="text" name="slug" value="{{#if page}}{{page.slug}}{{else}}{{slug}}{{/if}}">
+</label>
+<label>Title
+<input type="text" name="title" value="{{title}}">
+</label>
+<label>
+<input type="checkbox" name="public" {{#if public}}checked{{/if}}> Public
+</label>
+<div class="editor-split">
+<div>
+<label>Content (GFM)
+<textarea name="content" id="editor-content">{{body}}</textarea>
+</label>
+<div>
+<button type="submit">Save</button>
+{{#if page}}<a href="/pages/{{page.slug}}" class="secondary">cancel</a>{{/if}}
 </div>
-</form>`,
+</div>
+<div>
+<label>Preview</label>
+<div class="preview-pane" id="editor-preview"></div>
+</div>
+</div>
+<div>
+<button type="submit">Save</button>
+{{#if page}}<a href="/pages/{{page.slug}}" class="secondary">cancel</a>{{/if}}
+</div>
+</form>
+<script>
+(function(){
+  var pv = document.getElementById('editor-preview');
+  var title = document.querySelector('input[name=title]');
+  var slug = document.querySelector('input[name=slug]');
+  var timer;
+  var cm;
+  var ta = document.getElementById('editor-content');
+  if (typeof CodeMirror !== 'undefined') {
+    cm = CodeMirror.fromTextArea(ta, { mode:'markdown', lineWrapping:true });
+    cm.on('change', debounce);
+  } else {
+    ta.addEventListener('input', debounce);
+  }
+  if(title) title.addEventListener('input', debounce);
+  function update(){
+    var t = title ? title.value : '';
+    var s = slug ? slug.value : '';
+    var val = cm ? cm.getValue() : ta.value;
+    var c = '# ' + t + '\\n\\n' + val;
+    fetch('/api/render', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify({content:c,slug:s})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.html) pv.innerHTML=d.html;
+    }).catch(function(e){console.error('render error:',e)});
+  }
+  function debounce(){clearTimeout(timer);timer=setTimeout(update,400);}
+  update();
+})();
+</script>`,
+
+	settings: `<article>
+<h1>Settings</h1>
+<h2>Account</h2>
+<p>Email: <strong>{{email}}</strong></p>
+<form action="/logout" method="post"><button type="submit" class="outline secondary">Logout</button></form>
+<h2>API Key</h2>
+{{#if apiKey}}
+<pre><code>{{apiKey}}</code></pre>
+<small>Save this key now. It will not be shown again.</small>
+{{else if hasApiKey}}
+<p>An API key exists. Regenerate to get a new one.</p>
+{{else}}
+<p>No API key yet.</p>
+{{/if}}
+<form action="/settings/api-key" method="post">
+<button type="submit">{{#if hasApiKey}}Regenerate{{else}}Generate{{/if}} API Key</button>
+</form>
+</article>`,
 };
 
 export function renderTemplate(name: string, data: Record<string, unknown>, layoutData?: Record<string, unknown>): string {

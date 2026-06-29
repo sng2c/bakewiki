@@ -15,14 +15,13 @@
 ## 1. 인증 (auth) ✅
 
 ### 결정사항
-- 관리되는 JWT (allowlist 패턴): JWT 포맷 + DB 토큰 관리(revoke)
-- 단일 `tokens` 테이블로 세션/키 통합 (type: session|api)
+- 관리되는 JWT (allowlist 패턴): JWT 포맷 + auth.json 토큰 관리(revoke)
+- 단일 `tokens` 배열로 세션/키 통합 (type: session|api)
 - 쿠키 OR Bearer 헤더 동일 JWT 검증 → 웹/CLI/LLM 포맷 호환
 - 비밀번호 변경 시 본인 토큰만 무효 (revokeAllUserTokens)
 
 ### 파일
-- `src/db/schema.ts` — users, tokens
-- `src/db/index.ts` — initDb
+- `src/data.ts` — resolveDataDir, initDataDir, readAuth, writeAuth, AuthData 타입
 - `src/auth/password.ts` — hashPassword, verifyPassword (bcrypt)
 - `src/auth/jwt.ts` — signToken, verifyToken (jose, HS256)
 - `src/auth/token.ts` — issueSession, issueApiKey, touchToken, revokeToken, revokeAllUserTokens
@@ -38,41 +37,39 @@
 ## 2. 편집 (edit) ✅
 
 ### 파일
-- `src/db/schema.ts` — pages 테이블 (slug, title, content, **isPublic**, createdAt, updatedAt)
 - `src/pages/frontmatter.ts` — parseDocument, extractTitle, extractPublic
-- `src/pages/store.ts` — getPage, listPages, createPage, updatePage, deletePage
-- `src/pages/search.ts` — ensureFts (FTS5 + 트리거 + backfill), searchPages
+- `src/pages/store.ts` — getPage, listPages, createPage, updatePage, deletePage (파일시스템 기반)
+- `src/pages/search.ts` — buildSearchIndex, searchPages, listPagesFromIndex (인메모리)
 - `src/pages/routes.ts` — GET /, GET /:slug{.+}, POST /:slug{.+}, DELETE /:slug{.+}
 - `src/app.ts` — createApp
-- `src/env.ts` — AppEnv (Hono Variables 타입)
+- `src/env.ts` — Store, AppEnv (Hono Variables 타입)
 
 ### 결정사항
-- content는 GFM 원문(frontmatter 포함) 그대로 저장 → import/export 동일 포맷
-- slug는 슬래시 포함 계층 경로 → 라우트에 정규식 파라미터 `/:slug{.+}` 사용
-- FTS5 자체 저장 (snippet 지원)
+- content는 .md 파일 자체 → frontmatter 포함 GFM 원문
+- slug는 슬래시 포함 계층 경로 → 파일 경로에 1:1 매핑
+- 검색: 인메모리 인덱스 (서버 시작 시 빌드, CRUD 시 갱신)
 - 비공개 문서 미인증 시 404 (존재 은닉)
 
 ---
 
 ## 3. 공개/비공개 설정 (visibility) ✅
-- pages.isPublic 컬럼 + frontmatter.public 추출로 edit 단계에서 구현
+- frontmatter.public 추출로 edit 단계에서 구현
 
 ---
 
 ## 4. CLI ✅
 
 ### 파일
-- `src/migrate.ts` — runMigrations (Drizzle migrator)
-- `src/cli.ts` — 진입점 (bin), 서브커맨드 분기, dotenv 자동 로드
-- `src/cli/serve.ts` — serve (자동 마이그레이션 + @hono/node-server)
+- `src/cli.ts` — 진입점 (bin), 서브커맨드 분기, dotenv 자동 로드, --host/--port 파싱
+- `src/cli/serve.ts` — serve (데이터 디렉토리 초기화 + 검색 인덱스 빌드 + @hono/node-server)
 - `src/cli/init.ts` — init (TTY 인터랙티브 / non-TTY 환경변수 폴백)
-- `src/cli/import.ts` — import <dir> (.md → DB upsert)
-- `src/cli/export.ts` — export <dir> (DB → .md)
+- `src/cli/import.ts` — import <dir> (.md → pages 디렉토리 복사)
+- `src/cli/export.ts` — export <dir> (pages 디렉토리 → .md 복사)
 
 ### 결정사항
-- 마이그레이션: Drizzle Kit generate → migrator
 - init: TTY면 인터랙티브, non-TTY면 BAKEWIKI_ADMIN_EMAIL/PASSWORD 환경변수
 - `.env` 자동 로드 (dotenv/config)
+- serve: --host/--port CLI 플래그 지원 (환경변수 BAKEWIKI_HOST/BAKEWIKI_PORT 오버라이드)
 
 ---
 
@@ -104,14 +101,15 @@
 ## 6. 수정/고도화 이력 (MVP 이후)
 
 ### 버그 수정
-- **`public` → `is_public` 컬럼명 변경**: SQL 예약어 충돌로 UPDATE 실패. Drizzle `.returning()` 제거(better-sqlite3 UPDATE RETURNING 불안정) → re-SELECT 패턴. 새 마이그레이션(0000_dear_abomination).
-- **FTS5 트리거 'delete' 형식 오류**: 일반(contentless 아님) FTS5 테이블에서 special-command 형식이 실패 → `DELETE FROM pages_fts WHERE rowid = old.id`로 수정 (update/delete 트리거).
 - **UI 진입점 추가**: nav에 Login/Logout/New/Pages/Edit 버튼 추가. user 플래그를 body data에도 전달(page 템플릿 Edit 버튼).
-- **위키 동작**: 빈 페이지를 바로 edit로 리다이렉트 → 로그인 타이밍 없이 403 무한 루프. notFound 페이지 표시 + "Create this page" 버튼(인증 시) / "Login" 유도(미인증 시)로 변경.
+- **위키 동작**: 빈 페이지를 바로 edit로 리다이렉트 → 로그인 타이밍 없이 403 무한 루프. notFound 페이지 표시 + "Create this page" 버튼(인증 시) / "Login" 유유도(미인증 시)로 변경.
 
 ### 기능 추가
-- **0.0.0.0 리슨**: `BAKEWIKI_HOST` 환경변수 (기본 0.0.0.0). 외부 접속 가능.
+- **127.0.0.1 기본 바인드**: `BAKEWIKI_HOST` 기본값 127.0.0.1 (로컬 전용). `--host`/`--port` CLI 플래그 추가.
 - **위키 라우팅**: `/` = `/index` 슬러그. `/pages`로 전체 목록 이동.
+
+### 아키텍처 변경
+- **SQLite → 파일시스템 전환**: DB 의존성(better-sqlite3, drizzle-orm) 제거. 문서는 `~/.bakewiki/pages/<slug>.md`에 저장. 인증 데이터는 `~/.bakewiki/auth.json`에 저장. 검색은 인메모리 인덱스로 대체(FTS5 제거). 마이그레이션 시스템 제거.
 
 ---
 
@@ -121,18 +119,33 @@
 |------|------|--------|
 | `BAKEWIKI_JWT_SECRET` | JWT 서명 비밀키 (필수) | - |
 | `BAKEWIKI_PORT` | 서버 포트 | 3000 |
-| `BAKEWIKI_HOST` | 바인드 호스트 | 0.0.0.0 |
-| `BAKEWIKI_DB_PATH` | SQLite DB 경로 | ~/.bakewiki/data/bakewiki.db |
+| `BAKEWIKI_HOST` | 바인드 호스트 | 127.0.0.1 |
+| `BAKEWIKI_DATA_DIR` | 데이터 디렉토리 (pages/, auth.json) | ~/.bakewiki |
 | `BAKEWIKI_ADMIN_EMAIL` | init non-TTY용 | - |
 | `BAKEWIKI_ADMIN_PASSWORD` | init non-TTY용 | - |
 
 ---
 
-## 8. 향후 검토 (미구현)
+## 8. 데이터 디렉토리 구조
+
+```
+~/.bakewiki/
+├── pages/
+│   ├── index.md              ← slug = "index"
+│   ├── tech/
+│   │   └── web/
+│   │       └── http.md       ← slug = "tech/web/http"
+│   └── ...
+└── auth.json                 ← 사용자 + 토큰 (JSON)
+```
+
+---
+
+## 9. 향후 검토 (미구현)
 - [ ] Milkdown WYSIWYG 에디터 (현재 textarea)
 - [ ] llms.txt
 - [ ] 백링크
-- [ ] 버전 히스토리 / diff / rollback
+- [ ] 버전 히스트리 / diff / rollback
 - [ ] 청킹 메타데이터 (RAG용)
 - [ ] 태그/카테고리
 - [ ] npm 배포 (`npx bakewiki`)

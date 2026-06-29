@@ -1,4 +1,4 @@
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 export type Frontmatter = Record<string, unknown>;
 
@@ -38,4 +38,10 @@ export function extractPublic(doc: ParsedDocument): boolean {
 	const p = doc.frontmatter?.public;
 	if (typeof p === "boolean") return p;
 	return true;
+}
+
+// 분리된 title + public + body → GFM 문서 (frontmatter 포함) 조립
+export function buildDocument(title: string, isPublic: boolean, body: string): string {
+	const fm = stringifyYaml({ title, public: isPublic }).trimEnd();
+	return `---\n${fm}\n---\n${body}`;
 }

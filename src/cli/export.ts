@@ -1,28 +1,50 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { initDb } from "../db/index.js";
-import { runMigrations } from "../migrate.js";
-import { listPages, getPage } from "../pages/store.js";
+import { resolveDataDir } from "../data.js";
 
-// DB → 로컬 마크다운 폴더 동기화 (덮어쓰기).
-export async function exportCommand(dir: string): Promise<void> {
-	const root = path.resolve(dir);
-	await fs.mkdir(root, { recursive: true });
+// pages 디렉토리 → 외부 폴더로 복사 (덮어쓰기).
+export async function exportCommand(dir: string, dataDir?: string): Promise<void> {
+	const dest = path.resolve(dir);
+	await fs.mkdir(dest, { recursive: true });
 
-	const db = initDb();
-	runMigrations(db);
+	const resolvedDataDir = resolveDataDir(dataDir);
+	const src = path.join(resolvedDataDir, "pages");
 
-	const list = await listPages(db, true); // 관리 도구이므로 전체
+	// pages 디렉토리가 없으면 빈 상태
+	try {
+		await fs.access(src);
+	} catch {
+		console.log("No pages to export.");
+		return;
+	}
+
+	const files = await collectMarkdown(src);
 	let count = 0;
 
-	for (const { slug } of list) {
-		const page = await getPage(db, slug);
-		if (!page) continue;
-		const file = path.join(root, `${slug}.md`);
-		await fs.mkdir(path.dirname(file), { recursive: true });
-		await fs.writeFile(file, page.content, "utf8");
+	for (const file of files) {
+		const rel = path.relative(src, file);
+		const target = path.join(dest, rel);
+		await fs.mkdir(path.dirname(target), { recursive: true });
+		await fs.copyFile(file, target);
 		count++;
 	}
 
-	console.log(`Exported ${count} file(s) to ${root}.`);
+	console.log(`Exported ${count} file(s) to ${dest}.`);
+}
+
+async function collectMarkdown(root: string): Promise<string[]> {
+	const out: string[] = [];
+	async function walk(dir: string) {
+		const entries = await fs.readdir(dir, { withFileTypes: true });
+		for (const e of entries) {
+			const full = path.join(dir, e.name);
+			if (e.isDirectory()) {
+				await walk(full);
+			} else if (e.isFile() && /\.md$/i.test(e.name)) {
+				out.push(full);
+			}
+		}
+	}
+	await walk(root);
+	return out;
 }

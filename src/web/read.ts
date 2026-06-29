@@ -1,34 +1,64 @@
 import { Hono } from "hono";
-import type { DB } from "../db/index.js";
-import type { AppEnv } from "../env.js";
+import type { Store } from "../env.js";
+import type { AuthUser } from "../env.js";
 import { getPage, listPages } from "../pages/store.js";
 import { searchPages } from "../pages/search.js";
-import { parseDocument } from "../pages/frontmatter.js";
+import { readRedirects } from "../data.js";
+import { parseDocument, extractTitle } from "../pages/frontmatter.js";
 import { renderMarkdown } from "../render/markdown.js";
 import { renderTemplate } from "../render/hbs.js";
 
+// 슬러그에서 breadcrumb 항목 생성. 모든 페이지에 표시.
+// tech/web/http → [Home, tech, web, http(current)]
+function buildBreadcrumb(slug: string) {
+	const segments = slug.split("/");
+	const items: Array<{ name: string; href?: string; current?: boolean }> = [
+		{ name: "Home", href: "/" },
+	];
+	let acc = "";
+	for (let i = 0; i < segments.length; i++) {
+		acc = acc ? `${acc}/${segments[i]}` : segments[i];
+		if (i === segments.length - 1) {
+			items.push({ name: segments[i], current: true });
+		} else {
+			items.push({ name: segments[i], href: `/pages/${acc}` });
+		}
+	}
+	return items;
+}
+
 // 공통: 단일 페이지를 HTML로 렌더링. 없거나 권한 없으면 null.
-async function renderPage(db: DB, slug: string, authed: boolean): Promise<string | null> {
-	const page = await getPage(db, slug);
+async function renderPage(store: Store, slug: string, authed: boolean): Promise<string | null> {
+	const page = await getPage(store, slug);
 	if (!page) return null;
 	if (!page.isPublic && !authed) return null;
 	const doc = parseDocument(page.content);
-	const html = renderMarkdown(doc.body);
+	const title = extractTitle(doc) ?? page.slug;
+	const html = renderMarkdown(`# ${title}\n\n${doc.body}`, slug);
+	const breadcrumb = buildBreadcrumb(slug);
 	const view = {
-		page: { ...page, isPublic: page.isPublic, updatedAt: page.updatedAt.toISOString().slice(0, 10) },
+		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
 		html,
-		user: authed, // page 템플릿의 Edit 버튼 표시용
+		breadcrumb,
+		user: authed,
 	};
 	return renderTemplate("page", view, { title: page.title, user: authed, q: "" });
 }
 
-export function webReadRoutes(db: DB): Hono<AppEnv> {
-	const app = new Hono<AppEnv>();
+// 공통: 리다이렉트 조회. 있으면 301 리다이렉트, 없으면 null.
+async function checkRedirect(store: Store, slug: string): Promise<string | null> {
+	const redirects = await readRedirects(store.dataDir);
+	return redirects[slug] ?? null;
+}
+
+export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
+	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
 	// 홈 = /index 페이지. 없으면 notFound.
 	app.get("/", async (c) => {
 		const user = c.get("user");
-		const html = await renderPage(db, "index", !!user);
+		const store = c.get("store");
+		const html = await renderPage(store, "index", !!user);
 		if (html) return c.html(html);
 		return c.html(renderTemplate("notFound", { slug: "index", canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
 	});
@@ -36,7 +66,8 @@ export function webReadRoutes(db: DB): Hono<AppEnv> {
 	// 전체 목록 (/pages)
 	app.get("/pages", async (c) => {
 		const user = c.get("user");
-		const pages = await listPages(db, !!user);
+		const store = c.get("store");
+		const pages = await listPages(store, !!user);
 		const html = renderTemplate("list", { pages }, { title: "All pages", user: !!user, q: "" });
 		return c.html(html);
 	});
@@ -45,16 +76,22 @@ export function webReadRoutes(db: DB): Hono<AppEnv> {
 	app.get("/search", async (c) => {
 		const q = c.req.query("q") ?? "";
 		const user = c.get("user");
-		const results = q ? searchPages(db, q, !!user) : [];
+		const results = q ? searchPages(q, !!user) : [];
 		const html = renderTemplate("search", { q, results }, { title: "Search", user: !!user, q });
 		return c.html(html);
 	});
 
-	// 문서 조회 (/page/:slug{.+}). 없으면 notFound + 만들기 링크.
-	app.get("/page/:slug{.+}", async (c) => {
+	// 문서 조회 (/pages/:slug{.+}). 리다이렉트 → 301, 없으면 notFound.
+	app.get("/pages/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug")!;
 		const user = c.get("user");
-		const html = await renderPage(db, slug, !!user);
+		const store = c.get("store");
+
+		// 리다이렉트 확인
+		const redirectTo = await checkRedirect(store, slug);
+		if (redirectTo) return c.redirect(`/pages/${redirectTo}`, 301);
+
+		const html = await renderPage(store, slug, !!user);
 		if (html) return c.html(html);
 		return c.html(renderTemplate("notFound", { slug, canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
 	});

@@ -1,23 +1,35 @@
 {
-  "name": "bakewiki",
+  "name": "@sng2c/bakewiki",
   "version": "0.0.1",
   "description": "An open-source GFM wiki for humans and LLMs",
   "type": "module",
   "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sng2c/bakewiki.git"
+  },
+  "homepage": "https://github.com/sng2c/bakewiki",
+  "bugs": {
+    "url": "https://github.com/sng2c/bakewiki/issues"
+  },
   "bin": {
     "bakewiki": "dist/cli.js"
   },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "tsx src/cli.ts",
+    "dev": "tsx --watch src/cli.ts serve --data ./data",
+    "init": "tsx src/cli.ts init --data ./data",
+    "serve": "tsx src/cli.ts serve --data ./data",
+    "admin:create": "tsx src/cli.ts admin create --data ./data",
     "build": "tsc"
   },
   "dependencies": {
     "@hono/node-server": "2.0.6",
-    "@types/markdown-it": "14.1.2",
     "@vscode/markdown-it-katex": "1.1.2",
     "bcrypt": "6.0.0",
-    "better-sqlite3": "12.11.1",
-    "drizzle-orm": "0.45.2",
     "dotenv": "17.4.2",
     "handlebars": "4.7.9",
     "highlight.js": "11.11.1",
@@ -29,9 +41,8 @@
   },
   "devDependencies": {
     "@types/bcrypt": "6.0.0",
-    "@types/better-sqlite3": "7.6.13",
+    "@types/markdown-it": "14.1.2",
     "@types/node": "26.0.1",
-    "drizzle-kit": "0.31.10",
     "tsx": "4.22.4",
     "typescript": "6.0.3"
   }

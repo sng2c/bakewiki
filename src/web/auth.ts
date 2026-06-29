@@ -1,9 +1,7 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
 import { setCookie, deleteCookie, getCookie } from "hono/cookie";
-import type { DB } from "../db/index.js";
-import type { AppEnv } from "../env.js";
-import { users } from "../db/schema.js";
+import type { Store } from "../env.js";
+import type { AuthUser } from "../env.js";
 import { verifyPassword } from "../auth/password.js";
 import { issueSession, revokeToken } from "../auth/token.js";
 import { verifyToken } from "../auth/jwt.js";
@@ -12,8 +10,8 @@ import { renderTemplate } from "../render/hbs.js";
 const COOKIE_NAME = "bakewiki_session";
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
-export function webAuthRoutes(db: DB): Hono<AppEnv> {
-	const app = new Hono<AppEnv>();
+export function webAuthRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
+	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
 	// 로그인 페이지
 	app.get("/login", (c) => {
@@ -28,14 +26,14 @@ export function webAuthRoutes(db: DB): Hono<AppEnv> {
 		const email = String(form.get("email") ?? "");
 		const password = String(form.get("password") ?? "");
 
-		const rows = await db.select().from(users).where(eq(users.email, email)).limit(1);
-		const user = rows[0];
+		const store = c.get("store");
+		const user = store.auth.users.find((u) => u.email === email);
 		const ok = await verifyPassword(password, user?.passwordHash ?? "$2a$10$invalidinvalidinvalidinvalidinvalidinin");
 		if (!user || !ok) {
 			return c.html(renderTemplate("login", { error: "Invalid credentials" }, { title: "Login", user: false, q: "" }), 401);
 		}
 
-		const { token, expiresAt } = await issueSession(db, user.id);
+		const { token, expiresAt } = await issueSession(store, user.id);
 		setCookie(c, COOKIE_NAME, token, {
 			httpOnly: true,
 			sameSite: "Lax",
@@ -48,10 +46,11 @@ export function webAuthRoutes(db: DB): Hono<AppEnv> {
 
 	// 로그아웃
 	app.post("/logout", async (c) => {
+		const store = c.get("store");
 		const bearer = c.req.header("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
 		const cookie = getCookie(c, COOKIE_NAME);
 		const claims = await verifyToken(bearer ?? cookie ?? "");
-		if (claims) await revokeToken(db, claims.jti);
+		if (claims) await revokeToken(store, claims.jti);
 		deleteCookie(c, COOKIE_NAME, { path: "/" });
 		return c.redirect("/");
 	});

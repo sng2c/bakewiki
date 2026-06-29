@@ -2,10 +2,17 @@ import { SignJWT, jwtVerify } from "jose";
 
 const ALG = "HS256";
 
+// ── JWT 시크릿: 모듈 수준에서 설정 ──
+// config.yml에서 로드한 시크릿을 서버 시작 시 주입.
+let _secretKey: Uint8Array | null = null;
+
+export function setJwtSecret(secret: string): void {
+	_secretKey = new TextEncoder().encode(secret);
+}
+
 function secretKey(): Uint8Array {
-	const raw = process.env.BAKEWIKI_JWT_SECRET;
-	if (!raw) throw new Error("BAKEWIKI_JWT_SECRET is not set");
-	return new TextEncoder().encode(raw);
+	if (_secretKey) return _secretKey;
+	throw new Error("JWT secret not initialized. Call setJwtSecret() first.");
 }
 
 export type TokenClaims = {

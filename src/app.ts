@@ -1,24 +1,24 @@
 import { Hono } from "hono";
-import type { DB } from "./db/index.js";
-import type { AppEnv } from "./env.js";
+import type { Store } from "./env.js";
+import type { AuthUser } from "./env.js";
 import { auth } from "./auth/middleware.js";
+import { requireAuth } from "./auth/middleware.js";
 import { authRoutes } from "./auth/routes.js";
 import { pageRoutes } from "./pages/routes.js";
 import { searchPages } from "./pages/search.js";
-import { ensureFts } from "./pages/search.js";
+import { renderMarkdown } from "./render/markdown.js";
 import { listPages } from "./pages/store.js";
 import { webReadRoutes } from "./web/read.js";
 import { webAuthRoutes } from "./web/auth.js";
 import { webEditRoutes } from "./web/edit.js";
+import { webSettingsRoutes } from "./web/settings.js";
 
-export function createApp(db: DB): Hono<AppEnv> {
-	ensureFts(db);
+export function createApp(store: Store): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
+	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
-	const app = new Hono<AppEnv>();
-
-	// db + 선택적 인증 미들웨어
+	// store + 선택적 인증 미들웨어
 	app.use("*", async (c, next) => {
-		c.set("db", db);
+		c.set("store", store);
 		await next();
 	});
 	app.use("*", auth);
@@ -27,32 +27,46 @@ export function createApp(db: DB): Hono<AppEnv> {
 	app.get("/api/health", (c) => c.json({ ok: true }));
 
 	// 인증 API
-	app.route("/auth", authRoutes(db));
+	app.route("/auth", authRoutes());
 
 	// 문서 API
-	app.route("/api/pages", pageRoutes(db));
+	app.route("/api/pages", pageRoutes());
+
+	// 렌더 프리뷰 (POST /api/render). 관리자 전용.
+	app.post("/api/render", requireAuth, async (c) => {
+		const body = await c.req.json().catch(() => null);
+		const content = body?.content;
+		const slug = body?.slug;
+		if (typeof content !== "string") {
+			return c.json({ error: "content (string) is required" }, 400);
+		}
+		const html = renderMarkdown(content, typeof slug === "string" ? slug : undefined);
+		return c.json({ html });
+	});
 
 	// 검색 API (SPEC: /api/search)
 	app.get("/api/search", async (c) => {
 		const q = c.req.query("q");
 		if (!q) return c.json({ results: [] });
 		const user = c.get("user");
-		const results = searchPages(db, q, !!user);
+		const results = searchPages(q, !!user);
 		return c.json({ results });
 	});
 
 	// sitemap API
 	app.get("/api/sitemap", async (c) => {
 		const user = c.get("user");
-		const list = await listPages(db, !!user);
+		const store = c.get("store");
+		const list = await listPages(store, !!user);
 		const tree = buildSitemapTree(list.map((p) => p.slug));
 		return c.json({ tree });
 	});
 
 	// 웹 UI (HTML SSR)
-	app.route("/", webAuthRoutes(db));
-	app.route("/", webEditRoutes(db));
-	app.route("/", webReadRoutes(db));
+	app.route("/", webAuthRoutes());
+	app.route("/", webEditRoutes());
+	app.route("/", webReadRoutes());
+	app.route("/", webSettingsRoutes());
 
 	return app;
 }

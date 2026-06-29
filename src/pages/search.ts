@@ -1,45 +1,10 @@
-import type { Database } from "better-sqlite3";
-import type { DB } from "../db/index.js";
+import path from "node:path";
+import fs from "node:fs/promises";
+import { pagesDir } from "../data.js";
+import { parseDocument, extractTitle, extractPublic } from "./frontmatter.js";
 
-// Drizzle의 better-sqlite3 드라이버 raw 인스턴스 추출
-function rawDb(db: DB): Database {
-	// @ts-expect-error — drizzle better-sqlite3 driver exposes underlying session.client
-	return db.$client ?? db.session?.client;
-}
-
-const SETUP_SQL = `
-CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
-	slug, title, content
-);
-
-CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-	INSERT INTO pages_fts(rowid, slug, title, content)
-	VALUES (new.id, new.slug, new.title, new.content);
-END;
-
-CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-	DELETE FROM pages_fts WHERE rowid = old.id;
-END;
-
-CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-	DELETE FROM pages_fts WHERE rowid = old.id;
-	INSERT INTO pages_fts(rowid, slug, title, content)
-	VALUES (new.id, new.slug, new.title, new.content);
-END;
-`;
-
-const BACKFILL_SQL = `
-INSERT INTO pages_fts(rowid, slug, title, content)
-SELECT id, slug, title, content FROM pages
-WHERE id NOT IN (SELECT rowid FROM pages_fts);
-`;
-
-// 멱등: FTS5 테이블 + 트리거 생성 + 기존 데이터 backfill. serve 시작 시 1회 호출.
-export function ensureFts(db: DB): void {
-	const raw = rawDb(db);
-	raw.exec(SETUP_SQL);
-	raw.exec(BACKFILL_SQL);
-}
+// ── 인메모리 검색 인덱스 ──
+// 서버 시작 시 빌드, 페이지 CRUD 시 갱신.
 
 export type SearchResult = {
 	slug: string;
@@ -47,25 +12,95 @@ export type SearchResult = {
 	snippet: string;
 };
 
-const SEARCH_SQL = `
-SELECT p.slug AS slug, p.title AS title,
-	snippet(pages_fts, 2, '<mark>', '</mark>', '...', 20) AS snippet,
-	p.is_public AS is_public
-FROM pages_fts
-JOIN pages p ON p.id = pages_fts.rowid
-WHERE pages_fts MATCH ?
-ORDER BY rank
-`;
+type IndexEntry = {
+	title: string;
+	content: string;
+	isPublic: boolean;
+	updatedAt: string;
+};
 
-export function searchPages(db: DB, query: string, includePrivate = false): SearchResult[] {
-	const raw = rawDb(db);
-	const rows = raw.prepare(SEARCH_SQL).all(query) as Array<{
-		slug: string;
-		title: string;
-		snippet: string;
-		is_public: number;
-	}>;
-	return rows
-		.filter((r) => includePrivate || r.is_public === 1)
-		.map((r) => ({ slug: r.slug, title: r.title, snippet: r.snippet }));
+const index = new Map<string, IndexEntry>();
+
+// ── 인덱스 빌드 (서버 시작 시 1회) ──
+export async function buildSearchIndex(dataDir: string): Promise<void> {
+	index.clear();
+	const root = pagesDir(dataDir);
+	await walkAndIndex(root, root);
+}
+
+async function walkAndIndex(root: string, dir: string): Promise<void> {
+	const entries = await fs.readdir(dir, { withFileTypes: true });
+	for (const entry of entries) {
+		const full = path.join(dir, entry.name);
+		if (entry.isDirectory()) {
+			await walkAndIndex(root, full);
+		} else if (entry.isFile() && /\.md$/i.test(entry.name)) {
+			const slug = path.relative(root, full).replace(/\.md$/i, "").replace(/\\/g, "/");
+			try {
+				const content = await fs.readFile(full, "utf-8");
+				const stat = await fs.stat(full);
+				const doc = parseDocument(content);
+				const title = extractTitle(doc) ?? slug;
+				const isPublic = extractPublic(doc);
+				index.set(slug, { title, content, isPublic, updatedAt: stat.mtime.toISOString() });
+			} catch {
+				// 읽기 실패 시 스킵
+			}
+		}
+	}
+}
+
+// ── 인덱스 갱신 ──
+export function upsertSearchIndex(slug: string, title: string, content: string, isPublic: boolean, updatedAt: string): void {
+	index.set(slug, { title, content, isPublic, updatedAt });
+}
+
+export function removeFromSearchIndex(slug: string): void {
+	index.delete(slug);
+}
+
+// ── 검색 ──
+export function searchPages(query: string, includePrivate = false): SearchResult[] {
+	const lower = query.toLowerCase();
+	const results: Array<{ slug: string; title: string; snippet: string; rank: number }> = [];
+	for (const [slug, entry] of index) {
+		if (!includePrivate && !entry.isPublic) continue;
+		const titleMatch = entry.title.toLowerCase().includes(lower);
+		const contentLower = entry.content.toLowerCase();
+		const contentMatch = contentLower.includes(lower);
+		if (!titleMatch && !contentMatch) continue;
+
+		// 스니펫: 검색어 주변 텍스트
+		let snippet = "";
+		const idx = contentLower.indexOf(lower);
+		if (idx >= 0) {
+			const start = Math.max(0, idx - 40);
+			const end = Math.min(entry.content.length, idx + query.length + 40);
+			snippet = (start > 0 ? "..." : "") + entry.content.slice(start, end) + (end < entry.content.length ? "..." : "");
+			// 검색어 하이라이트
+			const before = snippet.slice(0, snippet.toLowerCase().indexOf(lower, start > 0 ? 3 : 0));
+			const match = snippet.slice(before.length, before.length + query.length);
+			const after = snippet.slice(before.length + query.length);
+			snippet = before + "<mark>" + match + "</mark>" + after;
+		} else {
+			snippet = entry.content.slice(0, 100);
+		}
+
+		const rank = titleMatch ? 2 : 1;
+		results.push({ slug, title: entry.title, snippet, rank });
+	}
+	results.sort((a, b) => b.rank - a.rank);
+	return results;
+}
+
+// ── 목록 (인덱스에서) ──
+export type PageSummary = { slug: string; title: string; updatedAt: string; isPublic: boolean };
+
+export function listPagesFromIndex(includePrivate = false): PageSummary[] {
+	const results: PageSummary[] = [];
+	for (const [slug, entry] of index) {
+		if (!includePrivate && !entry.isPublic) continue;
+		results.push({ slug, title: entry.title, updatedAt: entry.updatedAt, isPublic: entry.isPublic });
+	}
+	return results.sort((a, b) => a.slug.localeCompare(b.slug));
 }
