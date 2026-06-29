@@ -58,19 +58,24 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 }
 
 // slug 목록 → 계층 트리 구조
-function buildSitemapTree(slugs: string[]): unknown {
-	const root: Record<string, unknown> = {};
+interface SitemapNode {
+	slug: string;
+	children: SitemapNode[];
+}
+
+function buildSitemapTree(slugs: string[]): SitemapNode[] {
+	const root: SitemapNode[] = [];
 	for (const slug of slugs) {
 		const parts = slug.split("/");
-		let node = root;
+		let nodes = root;
 		for (let i = 0; i < parts.length; i++) {
 			const part = parts[i];
-			if (i === parts.length - 1) {
-				node[part] = node[part] ?? slug; // 리프 = 전체 slug
-			} else {
-				node[part] = node[part] ?? {};
-				node = node[part] as Record<string, unknown>;
+			let node = nodes.find((n) => n.slug === (i < parts.length - 1 ? parts.slice(0, i + 1).join("/") : slug));
+			if (!node) {
+				node = { slug: i < parts.length - 1 ? parts.slice(0, i + 1).join("/") : slug, children: [] };
+				nodes.push(node);
 			}
+			nodes = node.children;
 		}
 	}
 	return root;

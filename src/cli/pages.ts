@@ -28,7 +28,8 @@ export class BakewikiClient {
 	async listPages(): Promise<{ slug: string; title: string; public: boolean; updatedAt: string }[]> {
 		const { ok, data } = await this.request("GET", "/api/pages");
 		if (!ok) throw new Error(`Failed to list pages: ${JSON.stringify(data)}`);
-		return (data as { pages: { slug: string; title: string; public: boolean; updatedAt: string }[] }).pages;
+		const pages = (data as { pages: { slug: string; title: string; isPublic: boolean; updatedAt: string }[] }).pages;
+		return pages.map((p) => ({ slug: p.slug, title: p.title, public: p.isPublic, updatedAt: p.updatedAt }));
 	}
 
 	async getPage(slug: string): Promise<{ slug: string; title: string; public: boolean; updatedAt: string; content: string }> {
@@ -56,6 +57,27 @@ export class BakewikiClient {
 	async deletePage(slug: string): Promise<void> {
 		const { ok, data } = await this.request("DELETE", `/api/pages/${slug}`);
 		if (!ok) throw new Error(`Failed to delete page: ${JSON.stringify(data)}`);
+	}
+
+	async searchPages(query: string): Promise<{ slug: string; title: string; snippet: string }[]> {
+		const { ok, data } = await this.request("GET", `/api/search?q=${encodeURIComponent(query)}`);
+		if (!ok) throw new Error(`Failed to search: ${JSON.stringify(data)}`);
+		return (data as { results: { slug: string; title: string; snippet: string }[] }).results;
+	}
+
+	async sitemap(): Promise<{ slug: string; children?: Record<string, unknown> }[]> {
+		const { ok, data } = await this.request("GET", "/api/sitemap");
+		if (!ok) throw new Error(`Failed to get sitemap: ${JSON.stringify(data)}`);
+		return (data as { tree: { slug: string; children?: Record<string, unknown> }[] }).tree;
+	}
+
+	async health(): Promise<boolean> {
+		try {
+			const { ok } = await this.request("GET", "/api/health");
+			return ok;
+		} catch {
+			return false;
+		}
 	}
 }
 
@@ -176,18 +198,61 @@ export async function remoteCommand(subcommand: string, allArgs: string[]): Prom
 			validateKey(opts.key);
 			const slug = rest[0];
 			if (!slug) {
-				console.error("Usage: bakewiki pages delete <slug>");
+				console.error("Usage: bakewiki remote delete <slug>");
 				process.exit(1);
 			}
-			const client = new BakewikiClient(opts.url, opts.key);
-			await client.deletePage(slug);
+			const client5 = new BakewikiClient(opts.url, opts.key);
+			await client5.deletePage(slug);
 			console.log(`Deleted: ${slug}`);
 			break;
 		}
 
+		case "search": {
+			const query = rest[0];
+			if (!query) {
+				console.error("Usage: bakewiki remote search <query>");
+				process.exit(1);
+			}
+			const client6 = new BakewikiClient(opts.url, opts.key);
+			const results = await client6.searchPages(query);
+			if (results.length === 0) {
+				console.log("No results.");
+				return;
+			}
+			for (const r of results) {
+				console.log(`${r.slug}  ${r.title}`);
+				const snippet = r.snippet.replace(/<[^>]+>/g, "");
+				if (snippet) console.log(`  ${snippet}`);
+			}
+			break;
+		}
+
+		case "sitemap": {
+			const client7 = new BakewikiClient(opts.url, opts.key);
+			const tree = await client7.sitemap();
+			function printTree(nodes: { slug: string; children?: Record<string, unknown> }[], depth = 0) {
+				for (const node of nodes) {
+					console.log(`${"  ".repeat(depth)}${node.slug}`);
+					if (node.children) {
+						const childNodes = Object.values(node.children) as { slug: string; children?: Record<string, unknown> }[];
+						printTree(childNodes, depth + 1);
+					}
+				}
+			}
+			printTree(tree);
+			break;
+		}
+
+		case "health": {
+			const client8 = new BakewikiClient(opts.url, opts.key);
+			const ok = await client8.health();
+			console.log(ok ? "OK" : "FAIL");
+			process.exit(ok ? 0 : 1);
+		}
+
 		default:
-			console.error(`Unknown pages subcommand: ${subcommand}`);
-			console.error("Available: list, get, create, rename, delete");
+			console.error(`Unknown remote subcommand: ${subcommand}`);
+			console.error("Available: list, get, create, rename, delete, search, sitemap, health");
 			process.exit(1);
 	}
 }

@@ -35,6 +35,9 @@ Remote commands:
   remote create <slug> <file> [--url <url>] --key   Create/update page
   remote rename <old> <new> [--url <url>] --key      Rename page
   remote delete <slug> [--url <url>] --key           Delete page
+  remote search <query> [--url <url>] --key          Search pages
+  remote sitemap [--url <url>] --key              Show page tree
+  remote health [--url <url>]                  Health check
 
 Remote options:
   --url <url>     Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
