@@ -74,5 +74,5 @@
 - [ ] 검색 API 고도화 (페이지네이션, 필터)
 - [ ] 다크 모드 토글 (Pico CSS data-theme)
 - [x] 빈 문서 생성 허용 (slug만으로 생성 가능, title/body 없어도 됨)
-- [ ] 비공개 상속: 조상 중 하나라도 private이면 강제 private
+- [ ] 비공개 상속: 조상 중 하나라도 private이면 강제 private (dotfile 방식 검토했으나 역매핑 모호/트리 rename 비용으로 보류 — Option 2 전파 방식 또는 별도 매핑 필요)
 - [ ] 페이지 목록을 슬러그 기반 디렉토리 트리로 표현 (웹 /pages + CLI remote list)

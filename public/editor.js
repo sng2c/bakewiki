@@ -40,7 +40,7 @@
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }
 				else if (parts[i] !== '.' && parts[i] !== '') resolved.push(parts[i]);
 			}
-			return defaultNormalizeLink('/pages' + resolved.join('/'));
+			return defaultNormalizeLink('/pages/' + resolved.join('/'));
 		}
 		return defaultNormalizeLink(url);
 	};
