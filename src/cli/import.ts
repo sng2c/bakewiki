@@ -30,7 +30,7 @@ export async function importCommand(dir: string, dataDir?: string): Promise<void
 		// 검색 인덱스 갱신
 		const content = await fs.readFile(dest, "utf-8");
 		const doc = parseDocument(content);
-		const title = extractTitle(doc) ?? slug;
+		const title = extractTitle(doc) ?? "";
 		const isPublic = extractPublic(doc);
 		const fileStat = await fs.stat(dest);
 		upsertSearchIndex(slug, title, content, isPublic, fileStat.mtime.toISOString());

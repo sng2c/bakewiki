@@ -63,11 +63,11 @@ export async function createPage(store: Store, slug: string, content: string): P
 	await fs.mkdir(path.dirname(filePath), { recursive: true });
 	await fs.writeFile(filePath, content, "utf-8");
 	const doc = parseDocument(content);
-	const title = extractTitle(doc) || resolvedSlug;
+	const title = extractTitle(doc) ?? slug;
 	const isPublic = extractPublic(doc);
 	const stat = await fs.stat(filePath);
 	const updatedAt = stat.mtime.toISOString();
-	upsertSearchIndex(resolvedSlug, title, content, isPublic, updatedAt);
+	upsertSearchIndex(resolvedSlug, extractTitle(doc) ?? "", content, isPublic, updatedAt);
 	return { slug: resolvedSlug, title, content, isPublic, updatedAt };
 }
 
@@ -84,7 +84,7 @@ export async function updatePage(store: Store, slug: string, content: string): P
 	const isPublic = extractPublic(doc);
 	const stat = await fs.stat(filePath);
 	const updatedAt = stat.mtime.toISOString();
-	upsertSearchIndex(slug, title, content, isPublic, updatedAt);
+	upsertSearchIndex(slug, extractTitle(doc) ?? "", content, isPublic, updatedAt);
 	return { slug, title, content, isPublic, updatedAt };
 }
 
@@ -131,7 +131,7 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 	const stat = await fs.stat(newPath);
 	const updatedAt = stat.mtime.toISOString();
 	removeFromSearchIndex(oldSlug);
-	upsertSearchIndex(newSlug, title, content, isPublic, updatedAt);
+	upsertSearchIndex(newSlug, extractTitle(doc) ?? "", content, isPublic, updatedAt);
 
 	// 업로드 파일 동기화: oldSlug 프리픽스 파일들 rename + 본문 링크 갱신
 	const migrated = await migrateUploads(store.dataDir, oldSlug, newSlug);
@@ -139,7 +139,7 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 	if (migrated.length > 0) {
 		finalContent = rewriteUploadLinks(content, migrated);
 		await fs.writeFile(newPath, finalContent, "utf-8");
-		upsertSearchIndex(newSlug, title, finalContent, isPublic, updatedAt);
+		upsertSearchIndex(newSlug, extractTitle(doc) ?? "", finalContent, isPublic, updatedAt);
 	}
 
 	// 리다이렉트 등록 (oldSlug → newSlug)

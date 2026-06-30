@@ -96,7 +96,7 @@ ${RENDER_SCRIPTS}
 	list: `<h1>All pages</h1>
 <ul>
 {{#each pages}}
-<li><a href="/pages/{{slug}}">{{title}}</a> <small>{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small></li>
+<li><a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em style="color:var(--pico-muted-color,#999)">untitled</em>{{/if}}</a> <small>{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small></li>
 {{/each}}
 </ul>`,
 

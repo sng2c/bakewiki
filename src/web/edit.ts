@@ -43,7 +43,6 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const title = String(form.get("title") ?? "").trim();
 		const isPublic = form.get("public") === "on";
 		const body = String(form.get("content") ?? "");
-		if (!body.trim()) return c.redirect("/edit");
 		const content = buildDocument(title, isPublic, body);
 		const store = c.get("store");
 

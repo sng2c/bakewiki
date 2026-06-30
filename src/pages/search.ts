@@ -40,7 +40,7 @@ async function walkAndIndex(root: string, dir: string): Promise<void> {
 				const content = await fs.readFile(full, "utf-8");
 				const stat = await fs.stat(full);
 				const doc = parseDocument(content);
-				const title = extractTitle(doc) ?? slug;
+				const title = extractTitle(doc) ?? "";
 				const isPublic = extractPublic(doc);
 				index.set(slug, { title, content, isPublic, updatedAt: stat.mtime.toISOString() });
 			} catch {
