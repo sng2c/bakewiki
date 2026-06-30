@@ -1,5 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
+import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { parse as parseYaml } from "yaml";
 
@@ -18,6 +20,24 @@ export function pagesDir(dataDir: string): string {
 	return path.join(dataDir, "pages");
 }
 
+export function uploadsDir(dataDir: string): string {
+	return path.join(dataDir, "uploads");
+}
+
+// 정적 자산(JS) 디렉토리 해석. tsx(src) 실행과 dist(컴파일) 실행 모두 지원.
+// import.meta.url 위치에서 위로 올라가 public/ 폴더를 찾는다.
+export function publicDir(): string {
+	const here = path.dirname(fileURLToPath(import.meta.url));
+	let dir = here;
+	for (let i = 0; i < 5; i++) {
+		const candidate = path.join(dir, "public");
+		if (fsSync.existsSync(candidate)) return candidate;
+		dir = path.dirname(dir);
+	}
+	// 폴백: dist/public (빌드 산출물 표준 위치)
+	return path.join(here, "..", "public");
+}
+
 export function authPath(dataDir: string): string {
 	return path.join(dataDir, "auth.json");
 }
@@ -32,6 +52,7 @@ export function redirectsPath(dataDir: string): string {
 
 export async function initDataDir(dataDir: string): Promise<void> {
 	await fs.mkdir(pagesDir(dataDir), { recursive: true });
+	await fs.mkdir(uploadsDir(dataDir), { recursive: true });
 }
 
 // ── 설정 (config.yml) ──

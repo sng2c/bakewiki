@@ -41,6 +41,7 @@ Remote commands:
   search <query> [options]                       Search pages
   sitemap [options]                           Show page tree
   health [options]                            Health check
+  file <list|upload|delete> [options]            Manage uploaded images
 
 Remote options (before or after subcommand):
   --url <url>     Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
@@ -48,7 +49,7 @@ Remote options (before or after subcommand):
 `);
 }
 
-// 전체 인수에서 글로벌 옵션(--data, --version, --help)을 추출하고 서브커맨드+나머지를 반환.
+// Extract global options (--data, --version, --help) from all args and return the subcommand + the rest.
 function parseGlobalArgs(args: string[]): { dataDir?: string; cmd?: string; rest: string[] } {
 	let dataDir: string | undefined;
 	const positional: string[] = [];
@@ -68,7 +69,7 @@ function parseGlobalArgs(args: string[]): { dataDir?: string; cmd?: string; rest
 	return { dataDir, cmd: positional[0], rest: positional.slice(1) };
 }
 
-// serve 서브커맨드 인자 파싱: --host <addr>, --port <number>
+// serve subcommand arg parsing: --host <addr>, --port <number>
 function parseServeArgs(args: string[]): { port?: number; hostname?: string } {
 	let hostname: string | undefined;
 	let port: number | undefined;
@@ -127,7 +128,7 @@ async function main(): Promise<void> {
 			const { opts: remoteOpts, rest: remoteRest } = extractRemoteOpts(rest);
 			const sub = remoteRest[0];
 			if (!sub) {
-				console.error("Usage: bakewiki remote [options] <list|get|create|rename|delete|search|sitemap|health>");
+				console.error("Usage: bakewiki remote [options] <list|get|create|rename|delete|search|sitemap|health|file>");
 				process.exit(1);
 			}
 			await remoteCommand(sub, remoteRest.slice(1), remoteOpts);

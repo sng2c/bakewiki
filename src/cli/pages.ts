@@ -1,13 +1,13 @@
 import { resolveDataDir } from "../data.js";
 
-// ── 원격 API 클라이언트 ──
+// ── Remote API client ──
 
 export class BakewikiClient {
 	private baseUrl: string;
 	private apiKey: string;
 
 	constructor(url: string, apiKey: string) {
-		// 후행 슬래시 제거
+		// strip trailing slash
 		this.baseUrl = url.replace(/\/+$/, "");
 		this.apiKey = apiKey;
 	}
@@ -79,16 +79,43 @@ export class BakewikiClient {
 			return false;
 		}
 	}
+
+	// ── File (image) API ──
+
+	async listFiles(): Promise<{ url: string; filename: string; ext: string; size: number }[]> {
+		const { ok, data } = await this.request("GET", "/api/upload");
+		if (!ok) throw new Error(`Failed to list files: ${JSON.stringify(data)}`);
+		return (data as { files: { url: string; filename: string; ext: string; size: number }[] }).files;
+	}
+
+	async uploadFile(filename: string, data: Buffer, slug: string): Promise<{ url: string; filename: string; ext: string; size: number }> {
+		const form = new FormData();
+		form.append("file", new Blob([data as unknown as never]), filename);
+		form.append("slug", slug);
+		const res = await fetch(`${this.baseUrl}/api/upload`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${this.apiKey}` },
+			body: form,
+		});
+		const json = await res.json().catch(() => null);
+		if (!res.ok) throw new Error(`Failed to upload file: ${JSON.stringify(json)}`);
+		return json as { url: string; filename: string; ext: string; size: number };
+	}
+
+	async deleteFile(filename: string): Promise<void> {
+		const { ok, data } = await this.request("DELETE", `/api/upload/${encodeURIComponent(filename)}`);
+		if (!ok) throw new Error(`Failed to delete file: ${JSON.stringify(data)}`);
+	}
 }
 
-// ── 원격 옵션 파싱 ──
+// ── Remote options parsing ──
 
 export interface RemoteOpts {
 	url: string;
 	key: string;
 }
 
-// --url과 --key를 args에서 추출. 환경변수 폴백 포함.
+// Extract --url and --key from args. Includes env fallbacks.
 export function extractRemoteOpts(args: string[]): { opts: RemoteOpts; rest: string[] } {
 	let url = "";
 	let key = "";
@@ -118,10 +145,17 @@ function validateKey(key: string): void {
 	}
 }
 
-// ── pages 서브커맨드 ──
+// ── pages subcommands ──
 
 export async function remoteCommand(subcommand: string, allArgs: string[], opts: RemoteOpts): Promise<void> {
 	const rest = allArgs;
+
+	// file subcommand is two-level: file <list|upload|delete> [...]
+	if (subcommand === "file" || subcommand === "files") {
+		const fileSub = rest[0];
+		const fileArgs = rest.slice(1);
+		return fileCommand(fileSub, fileArgs, opts);
+	}
 
 	switch (subcommand) {
 		case "list":
@@ -133,7 +167,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 				console.log("No pages.");
 				return;
 			}
-			// 테이블 헤더
+			// table header
 			const maxSlug = Math.max(4, ...pages.map((p) => p.slug.length));
 			const maxTitle = Math.max(5, ...pages.map((p) => p.title.length));
 			console.log(`${"SLUG".padEnd(maxSlug)}  ${"TITLE".padEnd(maxTitle)}  VIS  UPDATED`);
@@ -252,7 +286,92 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 
 		default:
 			console.error(`Unknown remote subcommand: ${subcommand}`);
-			console.error("Available: list, get, create, rename, delete, search, sitemap, health");
+			console.error("Available: list, get, create, rename, delete, search, sitemap, health, file");
 			process.exit(1);
 	}
+}
+
+// ── file subcommand (upload management) ──
+async function fileCommand(sub: string | undefined, args: string[], opts: RemoteOpts): Promise<void> {
+	switch (sub) {
+		case "list":
+		case "ls": {
+			validateKey(opts.key);
+			const client = new BakewikiClient(opts.url, opts.key);
+			const files = await client.listFiles();
+			if (files.length === 0) {
+				console.log("No files.");
+				return;
+			}
+			const maxName = Math.max(4, ...files.map((f) => f.filename.length));
+			console.log(`${"FILENAME".padEnd(maxName)}  SIZE       URL`);
+			for (const f of files) {
+				const size = formatSize(f.size);
+				console.log(`${f.filename.padEnd(maxName)}  ${size.padStart(9)}  ${f.url}`);
+			}
+			break;
+		}
+
+		case "upload": {
+			validateKey(opts.key);
+			const file = args[0];
+			if (!file) {
+				console.error("Usage: bakewiki remote file upload <file|-> [name] [--slug <slug>]");
+				process.exit(1);
+			}
+			// Optional --slug
+			let slug = "";
+			const posArgs = args.filter(function (a, i) {
+				if (a === "--slug") { slug = args[i + 1] || ""; return false; }
+				if (args[i - 1] === "--slug") return false;
+				return true;
+			});
+			const realFile = posArgs[0];
+			const explicitName = posArgs[1];
+			const fs = await import("node:fs/promises");
+			const path = await import("node:path");
+			const client = new BakewikiClient(opts.url, opts.key);
+			let name: string;
+			let data: Buffer;
+			if (realFile === "-") {
+				// stdin
+				const chunks: Buffer[] = [];
+				for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+				data = Buffer.concat(chunks);
+				name = explicitName || "upload.png";
+			} else {
+				const resolved = path.resolve(realFile);
+				name = explicitName || path.basename(resolved);
+				data = await fs.readFile(resolved);
+			}
+			const result = await client.uploadFile(name, data, slug);
+			console.log(`Uploaded: ${result.url} (${formatSize(result.size)})`);
+			break;
+		}
+
+		case "delete":
+		case "rm": {
+			validateKey(opts.key);
+			const filename = args[0];
+			if (!filename) {
+				console.error("Usage: bakewiki remote file delete <filename>");
+				process.exit(1);
+			}
+			const client = new BakewikiClient(opts.url, opts.key);
+			await client.deleteFile(filename);
+			console.log(`Deleted: ${filename}`);
+			break;
+		}
+
+		default:
+			console.error(`Unknown file subcommand: ${sub}`);
+			console.error("Available: list, upload, delete");
+			process.exit(1);
+	}
+}
+
+function formatSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes}B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}K`;
+	return `${(bytes / 1024 / 1024).toFixed(1)}M`;
 }

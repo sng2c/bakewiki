@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { resolveDataDir } from "../data.js";
+import { resolveDataDir, uploadsDir } from "../data.js";
 
 // pages 디렉토리 → 외부 폴더로 복사 (덮어쓰기).
 export async function exportCommand(dir: string, dataDir?: string): Promise<void> {
@@ -30,6 +30,27 @@ export async function exportCommand(dir: string, dataDir?: string): Promise<void
 	}
 
 	console.log(`Exported ${count} file(s) to ${dest}.`);
+
+	// uploads 디렉토리 동반 복사 (이미지 등)
+	const uploadsSrc = uploadsDir(resolvedDataDir);
+	try {
+		await fs.access(uploadsSrc);
+		await copyDir(uploadsSrc, path.join(dest, "uploads"));
+		console.log("Exported uploads/");
+	} catch {
+		// uploads 없으면 스킵
+	}
+}
+
+async function copyDir(src: string, dest: string): Promise<void> {
+	await fs.mkdir(dest, { recursive: true });
+	const entries = await fs.readdir(src, { withFileTypes: true });
+	for (const e of entries) {
+		const s = path.join(src, e.name);
+		const d = path.join(dest, e.name);
+		if (e.isDirectory()) await copyDir(s, d);
+		else await fs.copyFile(s, d);
+	}
 }
 
 async function collectMarkdown(root: string): Promise<string[]> {

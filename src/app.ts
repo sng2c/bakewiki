@@ -1,15 +1,18 @@
 import { Hono } from "hono";
+import { serveStatic } from "@hono/node-server/serve-static";
 import type { Store } from "./env.js";
 import type { AuthUser } from "./env.js";
 import { auth } from "./auth/middleware.js";
 import { authRoutes } from "./auth/routes.js";
 import { pageRoutes } from "./pages/routes.js";
+import { uploadRoutes } from "./uploads/routes.js";
 import { searchPages } from "./pages/search.js";
 import { listPages } from "./pages/store.js";
 import { webReadRoutes } from "./web/read.js";
 import { webAuthRoutes } from "./web/auth.js";
 import { webEditRoutes } from "./web/edit.js";
 import { webSettingsRoutes } from "./web/settings.js";
+import { publicDir } from "./data.js";
 
 export function createApp(store: Store): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
 	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
@@ -29,6 +32,15 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 
 	// 문서 API
 	app.route("/api/pages", pageRoutes());
+
+	// 업로드 API
+	app.route("/api/upload", uploadRoutes());
+
+	// 업로드된 이미지 공개 서빙 (dataDir/uploads/*). 인증 불필요.
+	app.use("/uploads/*", serveStatic({ root: store.dataDir }));
+
+	// 정적 JS 자산 서빙 (/static/* → publicDir/*).
+	app.use("/static/*", serveStatic({ root: publicDir(), rewriteRequestPath: (p) => p.replace(/^\/static/, "") }));
 
 	// 검색 API (SPEC: /api/search)
 	app.get("/api/search", async (c) => {

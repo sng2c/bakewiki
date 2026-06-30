@@ -47,6 +47,17 @@
 ### v0.0.7 — 버그 수정
 - 순환 리다이렉트 방지 (A→B 후 B→A 시 기존 리다이렉트 정리)
 
+### v0.0.8 — 이미지 업로드 + 클라이언트 JS 분리
+- 이미지 업로드 API (`POST /api/upload`): 평면 저장 `uploads/<uuid>.<ext>`
+- 업로드 목록/삭제 API (`GET /api/upload`, `DELETE /api/upload/:filename`)
+- 정적 서빙 (`/uploads/*` via serveStatic)
+- 에디터 업로드 UI: 드래그/붙여넣기/선택 → 리스트(썸네일+삽입/삭제 버튼)
+- 클라이언트 JS 분리: 인라인 스크립트 → `public/page.js`, `public/editor.js` (`/static/*` 서빙)
+- 빌드 단계에 `scripts/copy-public.mjs` 추가 (tsc 후 public/ → dist/public/)
+- CLI `remote file` 서브커맨드 (list/upload/delete; stdin `-` 지원)
+- normalizeLink `/uploads/` 예외 (절대경로 통과)
+- `export` 시 `uploads/` 동반 복사
+
 ---
 
 ## 🔲 향후 검토 (미구현)
@@ -59,7 +70,7 @@
 - [ ] 태그/카테고리
 - [ ] 정적 사이트 빌드 (`bakewiki build`)
 - [ ] 멀티테넌트 호스팅
-- [ ] 이미지 업로드
+- [x] 이미지 업로드
 - [ ] 검색 API 고도화 (페이지네이션, 필터)
 - [ ] 다크 모드 토글 (Pico CSS data-theme)
 - [ ] 빈 문서 생성 허용 (slug만으로 생성 가능, title/body 없어도 됨)

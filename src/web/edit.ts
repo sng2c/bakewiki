@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
 import { requireAuth } from "../auth/middleware.js";
-import { getPage, createPage, updatePage, deletePage, renamePage, generateSlug } from "../pages/store.js";
+import { getPage, createPage, updatePage, deletePage, renamePage, generateSlug, migrateUploads, rewriteUploadLinks } from "../pages/store.js";
 import { parseDocument, extractTitle, extractPublic, buildDocument } from "../pages/frontmatter.js";
 import { renderTemplate } from "../render/hbs.js";
 
@@ -76,6 +76,15 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 				await updatePage(store, slug, content);
 			} else {
 				await createPage(store, slug, content);
+			}
+			// 임시(_) 업로드를 실제 slug로 이관 + 본문 링크 갱신
+			const migrated = await migrateUploads(store.dataDir, "", slug);
+			if (migrated.length > 0) {
+				const page = await getPage(store, slug);
+				if (page) {
+					const newContent = rewriteUploadLinks(page.content, migrated);
+					await updatePage(store, slug, newContent);
+				}
 			}
 		}
 		return c.redirect(`/pages/${slug}`);
