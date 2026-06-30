@@ -115,7 +115,7 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 	const view = {
 		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
 		breadcrumb,
-		body: doc.body,
+		body: `# ${title}\n\n${doc.body}`,
 		title,
 		slug,
 		user: authed,
