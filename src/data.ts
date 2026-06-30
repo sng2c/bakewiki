@@ -67,7 +67,7 @@ export async function initDataDir(dataDir: string): Promise<void> {
 	}
 	try { await fs.access(homeMetaPath); } catch {
 		const now = new Date().toISOString();
-		const content = stringifyYaml({ public: true, updatedAt: now }).trimEnd() + "\n";
+		const content = stringifyYaml({ public: true, updatedAt: now, title: "Welcome to BakeWiki" }).trimEnd() + "\n";
 		await fs.writeFile(homeMetaPath, content, "utf-8");
 	}
 }

@@ -144,12 +144,15 @@ ${RENDER_SCRIPTS}
 	editor: `<h1>{{#if page}}Edit: {{page.title}}{{else}}New page{{/if}}</h1>
 <form action="/edit" method="post">
 <input type="hidden" name="originalSlug" value="{{#if page}}{{page.slug}}{{/if}}">
+<label>Title
+<input type="text" name="title" value="{{title}}">
+</label>
 <label>
 <input type="checkbox" name="public" {{#if public}}checked{{/if}}> Public
 </label>
 <div class="editor-split">
 <div>
-<label>Content (GFM) <small>first # heading becomes the page title</small>
+<label>Content (GFM)
 <textarea name="content" id="editor-content">{{body}}</textarea>
 </label>
 <small>Files: drag/paste into the textarea or <label for="editor-file-input" role="button" class="secondary" style="font-size:0.8rem;padding:0.2rem 0.6rem">choose a file</label></small>

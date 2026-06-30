@@ -3,7 +3,11 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 export type Frontmatter = Record<string, unknown>;
 
-export type MetaData = { public: boolean; updatedAt: string };
+export type MetaData = {
+	public: boolean;
+	updatedAt: string;
+	title?: string;
+};
 
 export type ParsedDocument = {
 	frontmatter: Frontmatter | null;
@@ -27,7 +31,7 @@ export function parseDocument(raw: string): ParsedDocument {
 	return { frontmatter, body };
 }
 
-// title 추출: 첫 # 헤딩만 사용. frontmatter.title은 무시.
+// title 추출: 첫 # 헤딩만 사용. 폴백용.
 export function extractTitle(doc: ParsedDocument): string | null {
 	const heading = doc.body.match(/^#\s+(.+)$/m);
 	if (heading) return heading[1].trim();
@@ -52,6 +56,7 @@ export async function readMeta(metaFilePath: string): Promise<MetaData> {
 		return {
 			public: typeof parsed.public === "boolean" ? parsed.public : true,
 			updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+			title: typeof parsed.title === "string" ? parsed.title : undefined,
 		};
 	} catch {
 		return { public: true, updatedAt: new Date().toISOString() };
@@ -60,6 +65,8 @@ export async function readMeta(metaFilePath: string): Promise<MetaData> {
 
 // meta.yml 쓰기.
 export async function writeMeta(metaFilePath: string, meta: MetaData): Promise<void> {
-	const content = stringifyYaml({ public: meta.public, updatedAt: meta.updatedAt }).trimEnd() + "\n";
+	const data: Record<string, unknown> = { public: meta.public, updatedAt: meta.updatedAt };
+	if (meta.title !== undefined) data.title = meta.title;
+	const content = stringifyYaml(data).trimEnd() + "\n";
 	await fs.writeFile(metaFilePath, content, "utf-8");
 }

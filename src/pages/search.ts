@@ -40,7 +40,7 @@ async function indexPageDir(root: string, dir: string, parentSlug: string): Prom
 			const content = await fs.readFile(idxPath, "utf-8");
 			const meta = await readMeta(path.join(dir, "meta.yml"));
 			const doc = parseDocument(content);
-			const title = extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
+			const title = meta.title ?? extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
 			index.set(slug, { title, content: doc.body, isPublic: meta.public, updatedAt: meta.updatedAt });
 		}
 	} catch {
@@ -69,7 +69,7 @@ async function walkAndIndex(root: string, dir: string): Promise<void> {
 				const content = await fs.readFile(idxPath, "utf-8");
 				const meta = await readMeta(path.join(full, "meta.yml"));
 				const doc = parseDocument(content);
-				const title = extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
+				const title = meta.title ?? extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
 				index.set(slug, { title, content: doc.body, isPublic: meta.public, updatedAt: meta.updatedAt });
 			}
 		} catch {
