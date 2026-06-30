@@ -90,6 +90,8 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 function buildBreadcrumb(slug: string, title: string) {
 	const segments = slug.split("/");
 	const items: Array<{ name: string; href?: string; current?: boolean }> = [];
+	// 홈 표시
+	items.push({ name: "홈", href: "/" });
 	let acc = "";
 	for (let i = 0; i < segments.length; i++) {
 		acc = acc ? `${acc}/${segments[i]}` : segments[i];
