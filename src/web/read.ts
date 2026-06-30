@@ -7,9 +7,10 @@ import { readRedirects } from "../data.js";
 import { parseDocument, extractTitle } from "../pages/frontmatter.js";
 import { renderTemplate } from "../render/hbs.js";
 
-// 슬러그에서 breadcrumb 항목 생성. 모든 페이지에 표시.
-// tech/web/http → [Home, tech, web, http(current)]
-function buildBreadcrumb(slug: string) {
+// 슬러그에서 breadcrumb 항목 생성.
+// 마지막 세그먼트는 title로 표시, 나머지는 slug 세그먼트.
+// tech/web/HTTP + title="HTTP" → [Home, tech, web, HTTP(current)]
+function buildBreadcrumb(slug: string, title: string) {
 	const segments = slug.split("/");
 	const items: Array<{ name: string; href?: string; current?: boolean }> = [
 		{ name: "Home", href: "/" },
@@ -18,7 +19,7 @@ function buildBreadcrumb(slug: string) {
 	for (let i = 0; i < segments.length; i++) {
 		acc = acc ? `${acc}/${segments[i]}` : segments[i];
 		if (i === segments.length - 1) {
-			items.push({ name: segments[i], current: true });
+			items.push({ name: title || segments[i], current: true });
 		} else {
 			items.push({ name: segments[i], href: `/pages/${acc}` });
 		}
@@ -34,7 +35,7 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 	const doc = parseDocument(page.content);
 	const extractedTitle = extractTitle(doc) ?? "";
 	const title = extractedTitle;
-	const breadcrumb = buildBreadcrumb(slug);
+	const breadcrumb = buildBreadcrumb(slug, title);
 	const view = {
 		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
 		breadcrumb,

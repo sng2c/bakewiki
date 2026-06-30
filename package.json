@@ -1,6 +1,6 @@
 {
   "name": "@sng2c/bakewiki",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "An open-source GFM wiki for humans and LLMs",
   "type": "module",
   "license": "AGPL-3.0-or-later",
@@ -17,7 +17,8 @@
   },
   "files": [
     "dist",
-    "scripts"
+    "scripts",
+    "README.ko.md"
   ],
   "engines": {
     "node": ">=22"
@@ -31,6 +32,7 @@
   },
   "dependencies": {
     "@hono/node-server": "2.0.6",
+    "@sng2c/bakewiki": "^0.0.9",
     "bcrypt": "6.0.0",
     "dotenv": "17.4.2",
     "handlebars": "4.7.9",

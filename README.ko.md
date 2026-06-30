@@ -4,15 +4,17 @@
 
 오픈소스 GFM 위키. 인간과 LLM 모두를 위한 지식 관리.
 
-## 특징
+## 기능
 
-- **GFM 마크다운** — GitHub Flavored Markdown, 코드 하이라이팅·수식(KaTeX) 지원
-- **클라이언트 렌더링** — 페이지 조회와 에디터 프리뷰 모두 브라우저에서 렌더링
-- **파일시스템 기반** — 페이지는 `.md` 파일, Git으로 버전 관리 가능
-- **계층 슬러그** — `tech/web/http` 형태 경로, 상대 링크(`./hehe`, `../css`) 지원
+- **GFM 마크다운** — GitHub Flavored Markdown + 코드 하이라이팅 + KaTeX 수식
+- **클라이언트 사이드 렌더링** — 페이지 조회와 에디터 미리보기를 브라우저에서 렌더링 (markdown-it + highlight.js + KaTeX)
+- **파일시스템 기반** — `.md` 파일로 저장, Git 버전 관리 가능
+- **Title=Slug 모델** — 첫 `#` 헤딩이 페이지 제목이자 슬러그, 유니코드 지원
+- **계층 슬러그** — 디렉토리 구조로 페이지 조직화, 표준 상대 링크 지원
 - **인증** — 관리자 로그인, 세션 쿠키 + API 키 인증
 - **리다이렉트** — 슬러그 변경 시 자동 리다이렉트 매핑
-- **LLM 친화** — 구조화된 JSON API, API 키 인증
+- **부분 업데이트** — PATCH API로 공개여부, 본문, 슬러그 개별 변경
+- **LLM 친화적** — 구조화된 JSON API + API 키 인증
 
 ## 빠른 시작
 
@@ -22,7 +24,7 @@ npx @sng2c/bakewiki admin create --data ./data
 npx @sng2c/bakewiki serve --data ./data
 ```
 
-브라우저에서 http://127.0.0.1:3000 열기.
+http://127.0.0.1:3000 열기.
 
 ## CLI
 
@@ -36,7 +38,7 @@ bakewiki [options] <command> [command options]
 |------|------|----------|
 | `--data <path>` | 데이터 디렉토리 (로컬 명령에 필수) | `BAKEWIKI_DATA_DIR` |
 | `--version, -v` | 버전 출력 | |
-| `--help, -h` | 도움말 출력 | |
+| `--help, -h` | 도움말 | |
 
 ### 로컬 명령
 
@@ -45,34 +47,35 @@ bakewiki [options] <command> [command options]
 | `init` | 데이터 디렉토리 초기화 |
 | `admin create` | 관리자 계정 생성 |
 | `serve` | HTTP 서버 시작 |
-| `import <dir>` | 마크다운 폴더 가져오기 |
+| `import <dir>` | 마크다운 폴더를 위키로 가져오기 |
 | `export <dir>` | 위키를 마크다운 폴더로 내보내기 |
 
-Serve 옵션: `--host <addr>` (기본값: `127.0.0.1`), `--port <number>` (기본값: `3000`)
+serve 옵션: `--host <addr>` (기본값: `127.0.0.1`), `--port <number>` (기본값: `3000`)
 
 ### 원격 명령
 
 ```bash
-bakewiki remote [--url <url>] [--key <key>] <command>
+bakewiki remote [options] <command>
 ```
 
 | 명령 | 설명 | 인증 |
 |------|------|------|
-| `list` | 문서 목록 | 필요 |
-| `get <slug>` | 문서 조회 | 필요 |
-| `create <slug> <file>` | 문서 생성/수정 | 필요 |
-| `rename <old> <new>` | 문서 이름 변경 | 필요 |
-| `delete <slug>` | 문서 삭제 | 필요 |
-| `search <query>` | 검색 | 선택* |
-| `sitemap` | 페이지 트리 | 선택* |
-| `health` | 헬스체크 | 없음 |
+| `list` | 문서 목록 | 필수 |
+| `get <slug>` | 문서 조회 | 필수 |
+| `create <slug> <file>` | 문서 생성/수정 | 필수 |
+| `rename <old> <new>` | 문서 이름 변경 | 필수 |
+| `patch <slug> [--slug ...] [--public ...] [--body ...]` | 부분 업데이트 | 필수 |
+| `delete <slug>` | 문서 삭제 | 필수 |
+| `search <query>` | 문서 검색 | 선택* |
+| `sitemap` | 문서 트리 | 선택* |
+| `health` | 상태 확인 | 없음 |
 
-*비인증도 동작하지만 비공개 문서는 인증 필요
+*인증 없이도 동작하지만, 비공개 문서 조회에는 인증 필요.
 
 원격 옵션: `--url <url>` (기본값: `http://127.0.0.1:3000`), `--key <apikey>` (`BAKEWIKI_API_KEY`)
 
+옵션은 서브커맨드 앞뒤 모두 가능:
 ```bash
-# 옵션은 서브커맨드 앞뒤 모두 가능
 bakewiki remote --key bk_xxx list
 bakewiki remote list --key bk_xxx
 bakewiki remote --url http://... --key bk_xxx get index
@@ -80,35 +83,27 @@ bakewiki remote --url http://... --key bk_xxx get index
 
 ### 환경변수
 
-프로젝트 루트에 `.env` 파일을 두면 `dotenv`가 자동 로드합니다. `.env.example`을 참고하세요.
+`.env` 파일이 프로젝트 루트에 있으면 자동 로드. `.env.example` 참고.
 
 | 변수 | 설명 | 기본값 |
 |------|------|--------|
 | `BAKEWIKI_DATA_DIR` | 데이터 디렉토리 (`--data` 대체) | 필수 |
 | `BAKEWIKI_HOST` | 바인드 주소 | `127.0.0.1` |
 | `BAKEWIKI_PORT` | 포트 | `3000` |
-| `BAKEWIKI_URL` | 원격 명령용 서버 URL | `http://127.0.0.1:3000` |
-| `BAKEWIKI_API_KEY` | 원격 명령용 API 키 | |
+| `BAKEWIKI_URL` | 서버 URL (원격 명령용) | `http://127.0.0.1:3000` |
+| `BAKEWIKI_API_KEY` | API 키 (원격 명령용) | |
 | `BAKEWIKI_ADMIN_EMAIL` | 비대화형 관리자 생성 이메일 | |
 | `BAKEWIKI_ADMIN_PASSWORD` | 비대화형 관리자 생성 비밀번호 | |
-
-```bash
-# .env 예시
-BAKEWIKI_DATA_DIR=./data
-BAKEWIKI_PORT=3000
-BAKEWIKI_HOST=127.0.0.1
-BAKEWIKI_URL=http://127.0.0.1:3000
-BAKEWIKI_API_KEY=bk_xxx
-```
 
 ## 데이터 구조
 
 ```
 data/
-├── pages/           ← .md 파일
+├── pages/           ← .md 파일 (슬러그 = 디렉토리 + 타이틀)
 │   ├── index.md
-│   └── index/
-│       └── hehe.md
+│   └── tech/
+│       └── web/
+│           └── HTTP.md
 ├── auth.json        ← 사용자 + 토큰
 ├── config.yml       ← JWT 시크릿 (자동 생성)
 └── redirects.json   ← 슬러그 변경 리다이렉트 매핑
@@ -118,15 +113,28 @@ data/
 
 ```yaml
 ---
-title: 문서 제목
 public: true
 ---
-본문 내용...
+# 페이지 제목
+
+페이지 내용...
 ```
+
+- **제목**: 본문 첫 `#` 헤딩. frontmatter `title` 필드 없음.
+- **공개여부**: frontmatter `public`으로 제어 (기본값: `true`).
+- **슬러그**: 디렉토리 + 첫 `#` 헤딩에서 자동 유도. 예: `# HTTP` → 슬러그 `HTTP`, 디렉토리 `tech/web/` → `tech/web/HTTP`.
+
+### 링크 해석
+
+- **절대 링크**: `/tech/web/HTTP` → `/pages/tech/web/HTTP`
+- **상대 링크**: 현재 슬러그의 부모 디렉토리를 기준으로 해석 (표준 URL)
+  - 슬러그 `tech/web/HTTP`에서 `CSS` → `tech/web/CSS` (형제)
+  - 슬러그 `tech/web/HTTP`에서 `../API` → `tech/API` (삼촌)
+  - 슬러그 `tech/web/HTTP`에서 `./HTTP/HTTPS` → `tech/web/HTTP/HTTPS` (자식)
 
 ## API
 
-모든 API 엔드포인트는 `/api` 하위에 있습니다. 인증은 `Authorization: Bearer <api-key>` 헤더 또는 세션 쿠키를 사용합니다.
+모든 API 엔드포인트는 `/api` 하위. 인증은 `Authorization: Bearer <api-key>` 헤더 또는 세션 쿠키.
 
 ### 문서
 
@@ -140,12 +148,12 @@ GET /api/pages
 ```json
 {
   "pages": [
-    { "slug": "index", "title": "Home", "isPublic": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+    { "slug": "index", "title": "홈", "isPublic": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
     { "slug": "docs/api", "title": "API 문서", "isPublic": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
   ]
 }
 ```
-비인증 요청은 공개 문서만 반환합니다.
+미인증 요청은 공개 문서만 반환.
 
 #### 문서 조회
 
@@ -159,7 +167,7 @@ GET /api/pages/:slug
   "page": {
     "slug": "index",
     "title": "홈",
-    "content": "---\ntitle: 홈\npublic: true\n---\n환영합니다!",
+    "content": "---\npublic: true\n---\n# 홈\n\n환영합니다!",
     "isPublic": true,
     "updatedAt": "2026-06-29T12:00:00.000Z"
   }
@@ -173,7 +181,7 @@ GET /api/pages/:slug
 
 응답 `404`: `{ "error": "Not found" }`
 
-비인증 요청은 비공개 문서에 대해 404를 반환합니다.
+미인증 요청은 비공개 문서에 대해 404 반환.
 
 #### 문서 생성/수정
 
@@ -182,34 +190,48 @@ POST /api/pages/:slug
 Content-Type: application/json
 Authorization: Bearer <api-key>
 
-{ "content": "---\ntitle: 내 페이지\npublic: true\n---\n안녕하세요" }
+{ "content": "---\npublic: true\n---\n# 내 페이지\n\n안녕하세요" }
 ```
 
 응답 `200`:
 ```json
-{ "slug": "my-page", "title": "내 페이지", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+{ "slug": "내-페이지", "title": "내 페이지", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
 ```
 
-슬러그가 없으면 생성, 있으면 수정합니다. `content`는 전체 문서 본문(frontmatter + 마크다운)이어야 합니다.
+슬러그가 없으면 생성, 있으면 수정. `content`는 전체 문서 본문(frontmatter + markdown)이어야 함.
 
-#### 문서 이름 변경
+#### 부분 업데이트 (PATCH)
 
 ```
 PATCH /api/pages/:slug
 Content-Type: application/json
 Authorization: Bearer <api-key>
+```
 
+공개여부만 변경:
+```json
+{ "public": false }
+```
+
+본문만 변경:
+```json
+{ "body": "# 수정된 제목\n\n새 내용" }
+```
+
+이름 변경 (기존 rename):
+```json
 { "slug": "new-slug" }
+```
+
+복합 변경:
+```json
+{ "slug": "new-name", "public": true, "body": "# 새 제목\n\n내용" }
 ```
 
 응답 `200`:
 ```json
-{ "slug": "new-slug", "title": "내 페이지", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+{ "slug": "new-name", "title": "새 제목", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
 ```
-
-응답 `409`: `{ "error": "Not found or target slug already exists" }`
-
-이전 슬러그에서 새 슬러그로 리다이렉트가 자동 생성됩니다.
 
 #### 문서 삭제
 
@@ -232,12 +254,12 @@ GET /api/search?q=키워드
 ```json
 {
   "results": [
-    { "slug": "index", "title": "홈", "snippet": "<mark>위키</mark>에 오신 것을 환영합니다" }
+    { "slug": "index", "title": "홈", "snippet": "환영합니다. <mark>위키</mark>에 오신 것을" }
   ]
 }
 ```
 
-`q`가 없으면 빈 결과를 반환합니다. 비인증 요청은 공개 문서만 검색합니다.
+`q`가 없으면 빈 결과 반환. 미인증 요청은 공개 문서만 검색.
 
 ### 사이트맵
 
@@ -257,9 +279,9 @@ GET /api/sitemap
 }
 ```
 
-모든 문서의 계층 트리입니다. 비인증 요청은 공개 문서만 포함합니다.
+모든 문서의 계층 트리. 미인증 요청은 공개 문서만 포함.
 
-### 헬스체크
+### 상태 확인
 
 ```
 GET /api/health
@@ -271,10 +293,12 @@ GET /api/health
 
 ### 슬러그 규칙
 
-- 선행/후행 `/` 금지
+- 앞뒤 `/` 금지
 - `..` 세그먼트 금지
-- `tech/web/http` 형태로 계층 구조 생성
-- 슬러그 변경 시 `redirects.json`에 리다이렉트 자동 추적
+- 유니코드 지원 (예: `히히`, `파일들`)
+- `tech/web/HTTP` 형태의 계층 슬러그
+- `index` 슬러그는 홈페이지로 예약
+- 슬러그 변경 시 `redirects.json`에 리다이렉트 추적
 
 ## 개발
 
@@ -282,10 +306,20 @@ GET /api/health
 npm install
 npm run dev          # 개발 서버 (tsx --watch)
 npm run build        # TypeScript 컴파일
-npm run check        # 타입 체크
+npm run check         # 타입 체크
 ```
 
 Node.js ≥ 22 필요.
+
+## 마이그레이션
+
+이전 형식(frontmatter `title` 필드)에서 새 형식(본문 첫 `#` 헤딩)으로 마이그레이션:
+
+```bash
+node scripts/migrate-title-slug.mjs --data ./data
+```
+
+`--dry-run`으로 변경 사항을 미리 확인.
 
 ## 라이선스
 

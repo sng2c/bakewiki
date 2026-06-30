@@ -16,25 +16,44 @@
 		}
 	});
 
-	var slugInput = document.querySelector('input[name=slug]');
+	var directoryInput = document.querySelector('input[name=directory]');
+	var originalSlug = document.querySelector('input[name=originalSlug]');
 	var ta = document.getElementById('editor-content');
 	var pv = document.getElementById('editor-preview');
-	var titleInput = document.querySelector('input[name=title]');
 	var listEl = document.getElementById('editor-uploads');
 	var timer;
 
 	if (!ta || !pv) return;
 
-	// Link resolution: absolute /uploads,/pages; relative resolved against slug input
+	// Compute slug from directory + first # heading in content
+	function computeSlug() {
+		var dir = directoryInput ? directoryInput.value.trim() : '';
+		var body = ta.value;
+		var match = body.match(/^#\s+(.+)$/m);
+		var title = match ? match[1].trim() : '';
+		var slugPart = title
+			.replace(/\//g, '-')
+			.replace(/\s+/g, '-')
+			.replace(/#+/g, '')
+			.replace(/-+/g, '-')
+			.replace(/^-+|-+$/g, '');
+		if (!slugPart) return '';
+		return dir ? dir + '/' + slugPart : slugPart;
+	}
+
+	// Link resolution: standard URL — relative links resolve against parent directory.
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
 		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url);
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
-		var base = slugInput ? slugInput.value : '';
-		if (base) {
-			var parts = base.split('/').concat(url.split('/'));
+		// Relative URL: resolve against parent directory of current slug
+		var currentSlug = computeSlug() || (originalSlug ? originalSlug.value : '');
+		if (currentSlug) {
+			var slashIdx = currentSlug.lastIndexOf('/');
+			var dir = slashIdx >= 0 ? currentSlug.substring(0, slashIdx) : '';
+			var parts = (dir ? dir.split('/') : []).concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }
@@ -46,9 +65,7 @@
 	};
 
 	function update() {
-		var t = titleInput ? titleInput.value : '';
-		var c = '# ' + t + '\n\n' + ta.value;
-		pv.innerHTML = md.render(c);
+		pv.innerHTML = md.render(ta.value);
 		if (window.renderMathInElement) {
 			renderMathInElement(pv, {
 				delimiters: [
@@ -63,7 +80,7 @@
 	function debounce() { clearTimeout(timer); timer = setTimeout(update, 400); }
 
 	ta.addEventListener('input', debounce);
-	if (titleInput) titleInput.addEventListener('input', debounce);
+	if (directoryInput) directoryInput.addEventListener('input', debounce);
 	update();
 
 	// ── Insert text at cursor ──
@@ -79,7 +96,7 @@
 	async function uploadImage(file) {
 		var fd = new FormData();
 		fd.append('file', file);
-		fd.append('slug', slugInput ? slugInput.value : '');
+		fd.append('slug', computeSlug() || (originalSlug ? originalSlug.value : ''));
 		var r = await fetch('/api/upload', { method: 'POST', body: fd });
 		if (!r.ok) {
 			var j = await r.json().catch(function () {});

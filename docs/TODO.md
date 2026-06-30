@@ -58,9 +58,21 @@
 - normalizeLink `/uploads/` 예외 (절대경로 통과)
 - `export` 시 `uploads/` 동반 복사
 
----
+### v0.0.9 — Title=Slug 모델 + PATCH API
 
-## 🔲 향후 검토 (미구현)
+- **Title = 첫 `#` 헤딩**: frontmatter `title` 필드 제거, 본문 첫 `#` 헤딩을 페이지 제목으로 사용
+- **Slug = 디렉토리 + 타이틀**: 새 문서 생성 시 디렉토리 + 첫 `#` 헤딩에서 슬러그 자동 유도 (예: `# HTTP` → 슬러그 `HTTP`, 디렉토리 `tech/web/` → `tech/web/HTTP`)
+- **유니코드 슬러그**: 한글 등 유니코드 슬러그 지원 (예: `히히`, `파일들`)
+- **표준 URL 상대경로 해석**: 상대 링크를 현재 슬러그의 부모 디렉토리를 기준으로 해석 (형제 링크 `CSS` → `tech/web/CSS`)
+- **에디터 UI 변경**: Title 필드 제거, Directory 입력 추가, 슬러그 자동 유도
+- **Breadcrumb 개선**: 마지막 세그먼트에 title 표시
+- **PATCH API**: `PATCH /api/pages/:slug`로 부분 업데이트 지원 (`public`, `body`, `slug` 개별 또는 복합 변경)
+- **CLI `remote patch`**: `bakewiki remote patch <slug> [--slug ...] [--public ...] [--body ...]`
+- **마이그레이션 스크립트**: `scripts/migrate-title-slug.mjs` (기존 frontmatter title → 본문 `#` 헤딩, 슬러그 재유도)
+- **`index` 특수 처리**: 홈페이지 슬러그 `index` 유지
+- **이중 `<h1>` 제거**: 페이지 렌더링 시 본문 `#` 헤딩만 사용, 별도 title 렌더링 제거
+
+---
 
 - [ ] Milkdown WYSIWYG 에디터 (현재 textarea)
 - [ ] llms.txt

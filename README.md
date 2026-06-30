@@ -9,9 +9,11 @@ An open-source GFM wiki for humans and LLMs.
 - **GFM Markdown** — GitHub Flavored Markdown with code highlighting and KaTeX math
 - **Client-side rendering** — Page views and editor preview rendered in the browser (markdown-it + highlight.js + KaTeX)
 - **Filesystem-based** — Pages stored as `.md` files, version-controllable with Git
-- **Hierarchical slugs** — Paths like `tech/web/http`, relative links (`./hehe`, `../css`)
+- **Title-as-slug** — Page title (first `#` heading) determines the slug; Unicode supported
+- **Hierarchical slugs** — Directory structure for organization, standard relative links
 - **Auth** — Admin login, session cookies + API key authentication
 - **Redirects** — Automatic redirect mapping when slugs are renamed
+- **Partial updates** — PATCH API to change public flag, body, or slug individually
 - **LLM-friendly** — Structured JSON API with API key auth
 
 ## Quick start
@@ -62,6 +64,7 @@ bakewiki remote [options] <command>
 | `get <slug>` | Get page content | Required |
 | `create <slug> <file>` | Create/update page | Required |
 | `rename <old> <new>` | Rename page | Required |
+| `patch <slug> [--slug ...] [--public ...] [--body ...]` | Partial update | Required |
 | `delete <slug>` | Delete page | Required |
 | `search <query>` | Search pages | Optional* |
 | `sitemap` | Show page tree | Optional* |
@@ -96,10 +99,11 @@ A `.env` file in the project root is auto-loaded. See `.env.example` for referen
 
 ```
 data/
-├── pages/           ← .md files
+├── pages/           ← .md files (slug = directory + title)
 │   ├── index.md
-│   └── index/
-│       └── hehe.md
+│   └── tech/
+│       └── web/
+│           └── HTTP.md
 ├── auth.json        ← users + tokens
 ├── config.yml       ← JWT secret (auto-generated)
 └── redirects.json   ← slug rename redirect mapping
@@ -109,13 +113,24 @@ data/
 
 ```yaml
 ---
-title: Page Title
 public: true
 ---
+# Page Title
+
 Page content...
 ```
 
-`title` and `public` are edited in separate form fields, not in the body.
+- **Title**: First `#` heading in the body. No `title` field in frontmatter.
+- **Public**: Controlled via `public` in frontmatter (default: `true`).
+- **Slug**: Derived from directory + title. E.g., `# HTTP` in `tech/web/` → slug `tech/web/HTTP`.
+
+### Link resolution
+
+- **Absolute links**: `/tech/web/HTTP` → `/pages/tech/web/HTTP`
+- **Relative links**: Resolved against the parent directory of the current slug.
+  - From `tech/web/HTTP`: `CSS` → `tech/web/CSS` (sibling)
+  - From `tech/web/HTTP`: `../API` → `tech/API` (uncle)
+  - From `tech/web/HTTP`: `./HTTP/HTTPS` → `tech/web/HTTP/HTTPS` (child)
 
 ## API
 
@@ -152,7 +167,7 @@ Response `200`:
   "page": {
     "slug": "index",
     "title": "Home",
-    "content": "---\ntitle: Home\npublic: true\n---\nWelcome!",
+    "content": "---\npublic: true\n---\n# Home\n\nWelcome!",
     "isPublic": true,
     "updatedAt": "2026-06-29T12:00:00.000Z"
   }
@@ -175,7 +190,7 @@ POST /api/pages/:slug
 Content-Type: application/json
 Authorization: Bearer <api-key>
 
-{ "content": "---\ntitle: My Page\npublic: true\n---\nHello world" }
+{ "content": "---\npublic: true\n---\n# My Page\n\nHello world" }
 ```
 
 Response `200`:
@@ -185,24 +200,38 @@ Response `200`:
 
 Creates if the slug doesn't exist, updates if it does. `content` must be a string containing the full page body (frontmatter + markdown).
 
-#### Rename page
+#### Partial update (PATCH)
 
 ```
 PATCH /api/pages/:slug
 Content-Type: application/json
 Authorization: Bearer <api-key>
+```
 
+Change public flag only:
+```json
+{ "public": false }
+```
+
+Change body only:
+```json
+{ "body": "# Updated Title\n\nNew content" }
+```
+
+Rename (same as before):
+```json
 { "slug": "new-slug" }
+```
+
+Combine fields:
+```json
+{ "slug": "new-name", "public": true, "body": "# New Title\n\nContent" }
 ```
 
 Response `200`:
 ```json
-{ "slug": "new-slug", "title": "My Page", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+{ "slug": "new-name", "title": "New Title", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
 ```
-
-Response `409`: `{ "error": "Not found or target slug already exists" }`
-
-Creates a redirect from the old slug to the new one.
 
 #### Delete page
 
@@ -266,7 +295,9 @@ No authentication required.
 
 - No leading/trailing `/`
 - No `..` segments
-- Slugs like `tech/web/http` create a hierarchy
+- Unicode supported (e.g., `히히`, `파일들`)
+- Slugs like `tech/web/HTTP` create a hierarchy
+- The `index` slug is reserved for the home page
 - Redirects are tracked in `redirects.json` when slugs are renamed
 
 ## Development
@@ -279,6 +310,16 @@ npm run check        # Type check
 ```
 
 Requires Node.js ≥ 22.
+
+## Migration
+
+To migrate from the old format (frontmatter `title` field) to the new format (title from first `#` heading):
+
+```bash
+node scripts/migrate-title-slug.mjs --data ./data
+```
+
+Use `--dry-run` to preview changes without modifying files.
 
 ## License
 

@@ -24,13 +24,18 @@ export function parseDocument(raw: string): ParsedDocument {
 	return { frontmatter, body };
 }
 
-// title 추출: frontmatter.title > 없으면 첫 # 헤딩 > 없으면 slug fallback(호출자 책임)
+// title 추출: 첫 # 헤딩만 사용. frontmatter.title은 무시.
 export function extractTitle(doc: ParsedDocument): string | null {
-	const fmTitle = doc.frontmatter?.title;
-	if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
 	const heading = doc.body.match(/^#\s+(.+)$/m);
 	if (heading) return heading[1].trim();
 	return null;
+}
+
+// title을 본문 첫 # 헤딩에서 추출. 헤딩이 없으면 제목을 헤딩으로 추가.
+export function ensureHeading(body: string, title: string): string {
+	const heading = body.match(/^#\s+(.+)$/m);
+	if (heading) return body;
+	return `# ${title}\n\n${body}`;
 }
 
 // public 추출: frontmatter.public (boolean, 기본 true)
@@ -40,8 +45,8 @@ export function extractPublic(doc: ParsedDocument): boolean {
 	return true;
 }
 
-// 분리된 title + public + body → GFM 문서 (frontmatter 포함) 조립
-export function buildDocument(title: string, isPublic: boolean, body: string): string {
-	const fm = stringifyYaml({ title, public: isPublic }).trimEnd();
+// public + body → GFM 문서 조립. frontmatter에는 public만 포함.
+export function buildDocument(isPublic: boolean, body: string): string {
+	const fm = stringifyYaml({ public: isPublic }).trimEnd();
 	return `---\n${fm}\n---\n${body}`;
 }

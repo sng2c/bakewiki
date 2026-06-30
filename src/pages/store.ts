@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import type { Store } from "../env.js";
 import { pagesDir, readRedirects, writeRedirects, uploadsDir } from "../data.js";
 import { encodeSlugPrefix, decodeSlugPrefix } from "../uploads/routes.js";
-import { parseDocument, extractTitle, extractPublic, type ParsedDocument } from "./frontmatter.js";
+import { parseDocument, extractTitle, extractPublic, ensureHeading, type ParsedDocument } from "./frontmatter.js";
 import { upsertSearchIndex, removeFromSearchIndex } from "./search.js";
 
 // ── 타입 ──
@@ -57,13 +57,23 @@ export async function listPages(store: Store, includePrivate = false): Promise<P
 	return listPagesFromIndex(includePrivate);
 }
 
+// 타이틀에서 슬러그 유도: 공백→하이픈, /→하이픈, 앞뒤 공백/하이픈 제거
+export function deriveSlugFromTitle(title: string): string {
+	return title
+		.replace(/\//g, "-")
+		.replace(/\s+/g, "-")
+		.replace(/#+/g, "")
+		.replace(/-+/g, "-")
+		.replace(/^-+|-+$/g, "");
+}
+
 export async function createPage(store: Store, slug: string, content: string): Promise<Page> {
 	const resolvedSlug = slug || generateSlug();
 	const filePath = slugToPath(store.dataDir, resolvedSlug);
 	await fs.mkdir(path.dirname(filePath), { recursive: true });
 	await fs.writeFile(filePath, content, "utf-8");
 	const doc = parseDocument(content);
-	const title = extractTitle(doc) ?? slug;
+	const title = extractTitle(doc) ?? resolvedSlug;
 	const isPublic = extractPublic(doc);
 	const stat = await fs.stat(filePath);
 	const updatedAt = stat.mtime.toISOString();

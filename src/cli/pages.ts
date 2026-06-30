@@ -54,6 +54,12 @@ export class BakewikiClient {
 		return data as { slug: string; title: string };
 	}
 
+	async patchPage(slug: string, fields: { slug?: string; public?: boolean; body?: string }): Promise<{ slug: string; title: string; public: boolean; updatedAt: string }> {
+		const { ok, status, data } = await this.request("PATCH", `/api/pages/${slug}`, fields);
+		if (!ok) throw new Error(`Failed to patch page: ${JSON.stringify(data)} (status ${status})`);
+		return data as { slug: string; title: string; public: boolean; updatedAt: string };
+	}
+
 	async deletePage(slug: string): Promise<void> {
 		const { ok, data } = await this.request("DELETE", `/api/pages/${slug}`);
 		if (!ok) throw new Error(`Failed to delete page: ${JSON.stringify(data)}`);
@@ -219,12 +225,46 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 			const oldSlug = rest[0];
 			const newSlug = rest[1];
 			if (!oldSlug || !newSlug) {
-				console.error("Usage: bakewiki pages rename <old-slug> <new-slug>");
+				console.error("Usage: bakewiki remote rename <old-slug> <new-slug>");
 				process.exit(1);
 			}
 			const client = new BakewikiClient(opts.url, opts.key);
 			const result = await client.renamePage(oldSlug, newSlug);
 			console.log(`Renamed: ${oldSlug} → ${result.slug} (${result.title})`);
+			break;
+		}
+
+		case "patch": {
+			validateKey(opts.key);
+			const patchSlug = rest[0];
+			if (!patchSlug) {
+				console.error("Usage: bakewiki remote patch <slug> [--slug <new-slug>] [--public <true|false>] [--body <file|->]");
+				process.exit(1);
+			}
+			const fields: { slug?: string; public?: boolean; body?: string } = {};
+			for (let i = 1; i < rest.length; i++) {
+				if (rest[i] === "--slug" && rest[i + 1]) { fields.slug = rest[++i]; }
+				else if (rest[i] === "--public" && rest[i + 1]) { fields.public = rest[++i] === "true"; }
+				else if (rest[i] === "--body" && rest[i + 1]) {
+					const bodyFile = rest[++i];
+					const fs = await import("node:fs/promises");
+					const path = await import("node:path");
+					if (bodyFile === "-") {
+						const chunks: Buffer[] = [];
+						for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+						fields.body = Buffer.concat(chunks).toString("utf-8");
+					} else {
+						fields.body = await fs.readFile(path.resolve(bodyFile), "utf-8");
+					}
+				}
+			}
+			if (Object.keys(fields).length === 0) {
+				console.error("Error: No fields to update. Provide --slug, --public, or --body.");
+				process.exit(1);
+			}
+			const clientPatch = new BakewikiClient(opts.url, opts.key);
+			const patched = await clientPatch.patchPage(patchSlug, fields);
+			console.log(`Patched: ${patched.slug} (title: ${patched.title}, public: ${patched.public})`);
 			break;
 		}
 
@@ -286,7 +326,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 
 		default:
 			console.error(`Unknown remote subcommand: ${subcommand}`);
-			console.error("Available: list, get, create, rename, delete, search, sitemap, health, file");
+			console.error("Available: list, get, create, rename, patch, delete, search, sitemap, health, file");
 			process.exit(1);
 	}
 }

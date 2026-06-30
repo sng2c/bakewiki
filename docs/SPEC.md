@@ -17,18 +17,25 @@
 ## 2. 데이터 모델
 
 ### 2.1 식별자와 경로
-- **하이브리드 경로 모델**: 파일 시스템 스타일의 계층 경로 사용 (`/tech/web/http`)
-- **문서 식별자**: 슬러그(slug)
+- **슬러그 = 디렉토리 + 타이틀**: 파일 시스템 스타일의 계층 경로 사용 (`tech/web/HTTP`)
+- **타이틀 = 첫 `#` 헤딩**: 본문 첫 번째 `#` 헤딩이 페이지 제목. frontmatter `title` 필드 없음
+- **슬러그 유도**: 새 문서 생성 시 디렉토리 + 첫 `#` 헤딩에서 자동 유도 (`# HTTP` → `HTTP`)
+- **유니코드 지원**: 한글 등 유니코드 슬러그 허용 (`히히`, `파일들`)
+- **`index` 특수 슬러그**: 홈페이지는 항상 `index`
 - **다국어 매핑 기능**: 없음 (별개 문서로 취급)
 
 ### 2.2 메타데이터
 - **Frontmatter**: YAML 메타데이터 지원
-  - 예상 필드: `title`, `description`, `slug`, `namespace`, `aliases`, `updated`, `author`, `public` 등
+  - 유일한 필드: `public` (boolean, 기본값 `true`)
+  - `title` 필드는 사용하지 않음 (본문 첫 `#` 헤딩으로 대체)
 
 ### 2.3 링크
 - GFM 표준 링크만 사용 (`[텍스트](경로)`)
 - **절대 경로**: `/`로 시작 → 루트 기준 (`[HTTP](/tech/web/http)`)
-- **상대 경로**: `/`로 시작하지 않음 → 현재 문서 기준 (`[HTTP](../http)`)
+- **상대 경로**: 부모 디렉토리 기준 (표준 URL 해석)
+  - 슬러그 `tech/web/HTTP`에서 `CSS` → `tech/web/CSS` (형제)
+  - 슬러그 `tech/web/HTTP`에서 `../API` → `tech/API` (삼촌)
+  - 슬러그 `tech/web/HTTP`에서 `./HTTP/HTTPS` → `tech/web/HTTP/HTTPS` (자식)
 - 위키링크(`[[문서명]]`) 문법은 미지원
 - 트랜스클루전(`![[slug]]`) 미지원
 
@@ -85,7 +92,8 @@
 | GET | `/api/pages/:slug` | 문서 조회 (원문 GFM + HTML + frontmatter) | 공개문서는 무인증 |
 | GET | `/api/pages` | 문서 목록 (경로/네임스페이스별) | 공개문서만 |
 | GET | `/api/search?q=` | 전문 검색 (FTS5) | 공개문서만 |
-| POST | `/api/pages/:slug` | 문서 생성/수정 | 관리자 |
+| POST | `/api/pages/:slug` | 문서 생성/수정 (전체 콘텐츠) | 관리자 |
+| PATCH | `/api/pages/:slug` | 부분 업데이트 (public/body/slug) | 관리자 |
 
 ### 5.2 LLM 친화적 엔드포인트
 

@@ -12,6 +12,7 @@ dist/
 *.db-shm
 .data/
 data/
+data.bak*/
 
 # Env / secrets
 .env

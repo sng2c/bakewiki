@@ -21,16 +21,20 @@
 		}
 	});
 
-	// Link resolution: absolute /uploads,/pages; relative resolved against page slug
+	// Link resolution: standard URL — relative links resolve against parent directory.
+	// Slug = "tech/web/http" → base = "tech/web" (parent directory).
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
 		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url);
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
+		// Relative URL: resolve against parent directory of current slug
 		var base = d.slug;
 		if (base) {
-			var parts = base.split('/').concat(url.split('/'));
+			var slashIdx = base.lastIndexOf('/');
+			var dir = slashIdx >= 0 ? base.substring(0, slashIdx) : '';
+			var parts = (dir ? dir.split('/') : []).concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }
@@ -41,9 +45,8 @@
 		return defaultNormalizeLink(url);
 	};
 
-	// Render heading: dimmed 'untitled' placeholder if the page has no title.
-	var heading = d.title ? md.render('# ' + d.title) : '<h1><em style="color:var(--pico-muted-color,#999)">untitled</em></h1>';
-	el.innerHTML = heading + md.render(d.body);
+	// Render body directly — title comes from first # heading in body.
+	el.innerHTML = md.render(d.body);
 
 	if (window.renderMathInElement) {
 		renderMathInElement(el, {
