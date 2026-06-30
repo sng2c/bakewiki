@@ -33,7 +33,7 @@ export async function importCommand(dir: string, dataDir?: string): Promise<void
 		const title = extractTitle(doc) ?? "";
 		const isPublic = extractPublic(doc);
 		const fileStat = await fs.stat(dest);
-		upsertSearchIndex(slug, title, content, isPublic, fileStat.mtime.toISOString());
+		upsertSearchIndex(slug, title, doc.body, isPublic, fileStat.mtime.toISOString());
 
 		exists ? updated++ : created++;
 	}

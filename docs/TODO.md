@@ -72,6 +72,25 @@
 - **`index` 특수 처리**: 홈페이지 슬러그 `index` 유지
 - **이중 `<h1>` 제거**: 페이지 렌더링 시 본문 `#` 헤딩만 사용, 별도 title 렌더링 제거
 
+### v0.0.10 — 업로드 디렉토리 모델 + 위키링크 + CLI 개선
+
+- **업로드 디렉토리 저장**: `uploads/<slug>@@<file>` → `uploads/<slug>/<file>` (평면 → 디렉토리)
+- **`@@` 콘텐츠 마커**: 본문에 `![](@@file.jpg)` 형태로 저장, 렌더링 시 현재 slug로 동적 변환
+- **rename 단순화**: 디렉토리 rename 1회, 본문 링크 치환 불필요
+- **위키링크 `[[ ]]`**: `[[slug]]` → 절대 슬러그 링크, `[[slug|표시텍스트]]` 지원
+- **짧은 API 키**: JWT(~200자) → `bk_` + 랜덤(~35자) opaque 토큰
+- **설정 페이지 클립보드 복사 버튼** 추가
+- **페이지 목록 트리**: 디렉토리별 그룹, 디렉토리 클릭 시 페이지로 이동
+- **`index` 예외 제거**: 일반 슬러그와 동일 취급
+- **슬러그 복사 버튼**: 페이지 조회 + 목록에서 슬러그 복사
+- **새 페이지 자동 채움**: `/edit/tech/web/HTTP` → 디렉토리 `tech/web` + 본문 `# HTTP`
+- **CLI `remote list`**: 평면 테이블 → 디렉토리 트리 출력
+- **CLI `remote get`**: 배치 조회, `----` 구분, frontmatter 제거 본문, 리다이렉트 자동 팔로우
+- **CLI `remote search`**: `----` 구분, 스니펫 정제, 결과 카운트
+- **API `/api/sitemap`**: 각 노드에 `title`, `isPublic` 추가
+- **검색 인덱스**: frontmatter 제거한 body만 인덱싱
+- **마이그레이션**: `scripts/migrate-uploads-dir.mjs`
+
 ---
 
 - [ ] Milkdown WYSIWYG 에디터 (현재 textarea)

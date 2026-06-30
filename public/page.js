@@ -21,10 +21,46 @@
 		}
 	});
 
+	// Slug → upload directory path (strip leading/trailing /, keep internal /)
+	function slugToUploadDir(slug) {
+		if (!slug) return '_';
+		return slug.replace(/^\/+|\/+$/g, '');
+	}
+
+	// Resolve a wiki-link target to a URL. Absolute slug only.
+	function resolveWikiLink(target) {
+		return '/pages/' + target;
+	}
+
+	// Wiki-link rule: [[target]] or [[target|display]]
+	md.inline.ruler.before('link', 'wikilink', function (state, silent) {
+		var src = state.src.slice(state.pos);
+		var match = src.match(/^\[\[([^\]]+)\]\]/);
+		if (!match) return false;
+		if (!silent) {
+			var parts = match[1].split('|');
+			var target = parts[0].trim();
+			var display = parts.length > 1 ? parts[1].trim() : target;
+			var url = resolveWikiLink(target);
+			var token = state.push('link_open', 'a', 1);
+			token.attrs = [['href', url]];
+			token = state.push('text', '', 0);
+			token.content = display;
+			state.push('link_close', 'a', -1);
+		}
+		state.pos += match[0].length;
+		return true;
+	});
+
 	// Link resolution: standard URL — relative links resolve against parent directory.
 	// Slug = "tech/web/http" → base = "tech/web" (parent directory).
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
+		// @@<file> marker → upload reference, resolve with current slug
+		if (url.startsWith('@@') && d.slug) {
+			var ufile = url.slice(2);
+			return defaultNormalizeLink('/uploads/' + slugToUploadDir(d.slug) + '/' + ufile);
+		}
 		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url);
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
 		if (url.startsWith('#')) return defaultNormalizeLink(url);

@@ -43,8 +43,11 @@ article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
 .page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
 .page-header nav[aria-label="breadcrumb"] { margin:0; }
-.editor-split { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-@media (max-width:768px) { .editor-split { grid-template-columns:1fr; } }
+.editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
+.editor-split > div { min-width:0; overflow:hidden; }
+fieldset { min-width:0; max-width:100%; }
+#editor-uploads { overflow:hidden; word-break:break-all; }
+.upload-item { overflow:hidden; }
 .preview-pane { border:1px solid var(--pico-muted-border-color,#ccc); border-radius:var(--pico-border-radius,0.25rem); padding:1rem; min-height:320px; overflow:auto; background:var(--pico-card-background-color,#f8f8f8); }
 </style>
 </head>
@@ -75,6 +78,7 @@ ${RENDER_SCRIPTS}
 ${RENDER_SCRIPTS}
 <script src="/static/editor.js" defer></script>
 {{/if}}
+<script>function copySlug(s){navigator.clipboard.writeText(s).then(function(){event.target.textContent='Copied!';setTimeout(function(){event.target.textContent='Copy slug'},2000)})}</script>
 </body>
 </html>`,
 
@@ -88,15 +92,13 @@ ${RENDER_SCRIPTS}
 </div>
 <article id="page-content"></article>
 <div id="page-attachments"></div>
-{{#if user}}
-<p><a href="/edit/{{page.slug}}" role="button">Edit</a></p>
-{{/if}}
+<p><small><button type="button" onclick="copySlug('{{slug}}')" class="outline secondary" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Copy slug</button>{{#if user}} <a href="/edit/{{slug}}" role="button" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Edit</a>{{/if}}</small></p>
 <script id="page-data" type="application/json">{{{pageData}}}</script>`,
 
 	list: `<h1>All pages</h1>
-<ul>
-{{#each pages}}
-<li><a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em style="color:var(--pico-muted-color,#999)">untitled</em>{{/if}}</a> <small>{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small></li>
+<ul style="list-style:none;padding:0 1rem">
+{{#each items}}
+<li style="margin-left:calc({{depth}} * 1.5rem)">{{#if isDir}}<a href="/pages/{{dirPath}}">{{name}}</a>{{else}}<a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em style="color:var(--pico-muted-color,#999)">untitled</em>{{/if}}</a> <small style="color:var(--pico-muted-color,#999)">{{slug}}{{#unless isPublic}} 🔒{{/unless}} <button type="button" onclick="copySlug('{{slug}}')" class="outline secondary" style="font-size:0.7rem;padding:0.1rem 0.4rem;margin:0">Copy</button></small>{{/if}}</li>
 {{/each}}
 </ul>`,
 
@@ -178,8 +180,12 @@ ${RENDER_SCRIPTS}
 <form action="/logout" method="post"><button type="submit" class="outline secondary">Logout</button></form>
 <h2>API Key</h2>
 {{#if apiKey}}
-<pre><code>{{apiKey}}</code></pre>
+<div style="display:flex;align-items:center;gap:0.5rem">
+<pre style="margin:0;flex:1;overflow-x:auto"><code id="api-key">{{apiKey}}</code></pre>
+<button type="button" onclick="copyApiKey()" class="secondary" style="white-space:nowrap">Copy</button>
+</div>
 <small>Save this key now. It will not be shown again.</small>
+<script>function copyApiKey(){var k=document.getElementById('api-key').textContent;navigator.clipboard.writeText(k).then(function(){var b=event.target;b.textContent='Copied!';setTimeout(function(){b.textContent='Copy'},2000)})}</script>
 {{else if hasApiKey}}
 <p>An API key exists. Regenerate to get a new one.</p>
 {{else}}

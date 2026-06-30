@@ -2,8 +2,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import type { Store } from "../env.js";
-import { pagesDir, readRedirects, writeRedirects, uploadsDir } from "../data.js";
-import { encodeSlugPrefix, decodeSlugPrefix } from "../uploads/routes.js";
+import { pagesDir, uploadsDir } from "../data.js";
+import { slugToUploadDir, dirToSlug } from "../uploads/routes.js";
 import { parseDocument, extractTitle, extractPublic, ensureHeading, type ParsedDocument } from "./frontmatter.js";
 import { upsertSearchIndex, removeFromSearchIndex } from "./search.js";
 
@@ -77,7 +77,8 @@ export async function createPage(store: Store, slug: string, content: string): P
 	const isPublic = extractPublic(doc);
 	const stat = await fs.stat(filePath);
 	const updatedAt = stat.mtime.toISOString();
-	upsertSearchIndex(resolvedSlug, extractTitle(doc) ?? "", content, isPublic, updatedAt);
+	upsertSearchIndex(resolvedSlug, extractTitle(doc) ?? "", doc.body, isPublic, updatedAt);
+
 	return { slug: resolvedSlug, title, content, isPublic, updatedAt };
 }
 
@@ -94,7 +95,7 @@ export async function updatePage(store: Store, slug: string, content: string): P
 	const isPublic = extractPublic(doc);
 	const stat = await fs.stat(filePath);
 	const updatedAt = stat.mtime.toISOString();
-	upsertSearchIndex(slug, extractTitle(doc) ?? "", content, isPublic, updatedAt);
+	upsertSearchIndex(slug, extractTitle(doc) ?? "", doc.body, isPublic, updatedAt);
 	return { slug, title, content, isPublic, updatedAt };
 }
 
@@ -141,7 +142,7 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 	const stat = await fs.stat(newPath);
 	const updatedAt = stat.mtime.toISOString();
 	removeFromSearchIndex(oldSlug);
-	upsertSearchIndex(newSlug, extractTitle(doc) ?? "", content, isPublic, updatedAt);
+	upsertSearchIndex(newSlug, extractTitle(doc) ?? "", doc.body, isPublic, updatedAt);
 
 	// 업로드 파일 동기화: oldSlug 프리픽스 파일들 rename + 본문 링크 갱신
 	const migrated = await migrateUploads(store.dataDir, oldSlug, newSlug);
@@ -149,56 +150,64 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 	if (migrated.length > 0) {
 		finalContent = rewriteUploadLinks(content, migrated);
 		await fs.writeFile(newPath, finalContent, "utf-8");
-		upsertSearchIndex(newSlug, extractTitle(doc) ?? "", finalContent, isPublic, updatedAt);
+		upsertSearchIndex(newSlug, extractTitle(doc) ?? "", parseDocument(finalContent).body, isPublic, updatedAt);
 	}
-
-	// 리다이렉트 등록 (oldSlug → newSlug)
-	// 순환 방지: newSlug를 가리키는 기존 리다이렉트 제거
-	const redirects = await readRedirects(store.dataDir);
-	delete redirects[newSlug]; // B → A 순환 차단
-	for (const key of Object.keys(redirects)) {
-		if (redirects[key] === newSlug) delete redirects[key]; // X → newSlug 정리
-	}
-	redirects[oldSlug] = newSlug;
-	await writeRedirects(store.dataDir, redirects);
 
 	return { slug: newSlug, title, content: finalContent, isPublic, updatedAt };
 }
 
 // ── 업로드 마이그레이션 (rename 시) ──
-// <oldPrefix>-<original> 파일들을 <newPrefix>-<original>로 rename. 반환: [{oldUrl, newUrl}]
+// uploads/<oldSlug>/ 디렉토리를 uploads/<newSlug>/로 rename. 반환: [{oldUrl, newUrl}]
+// oldSlug가 빈 경우 (새 문서 저장) uploads/_/ 내 파일들을 uploads/<newSlug>/로 이동.
 export async function migrateUploads(
 	dataDir: string,
 	oldSlug: string,
 	newSlug: string,
 ): Promise<Array<{ oldUrl: string; newUrl: string }>> {
-	const oldPrefix = encodeSlugPrefix(oldSlug);
-	const newPrefix = encodeSlugPrefix(newSlug);
-	const dir = uploadsDir(dataDir);
-	let entries: string[];
-	try {
-		entries = await fs.readdir(dir);
-	} catch {
-		return [];
-	}
-	const migrated: Array<{ oldUrl: string; newUrl: string }> = [];
-	for (const name of entries) {
-		const decoded = decodeSlugPrefix(name);
-		if (encodeSlugPrefix(decoded) !== oldPrefix) continue;
-		const sepIdx = name.indexOf("@@");
-		const suffix = sepIdx >= 0 ? name.slice(sepIdx + 2) : name; // <original>
-		const newName = `${newPrefix}@@${suffix}`;
+	const uploadsRoot = uploadsDir(dataDir);
+	const oldDir = slugToUploadDir(oldSlug);
+	const newDir = slugToUploadDir(newSlug);
+	const oldPath = path.join(uploadsRoot, oldDir);
+	const newPath = path.join(uploadsRoot, newDir);
+
+	// oldSlug가 빈 경우: uploads/_/ 에서 파일들을 개별 이동
+	if (!oldSlug) {
+		let entries: string[];
 		try {
-			await fs.rename(path.join(dir, name), path.join(dir, newName));
-			migrated.push({ oldUrl: `/uploads/${name}`, newUrl: `/uploads/${newName}` });
+			entries = await fs.readdir(oldPath);
 		} catch {
-			// skip
+			return [];
 		}
+		await fs.mkdir(newPath, { recursive: true });
+		const migrated: Array<{ oldUrl: string; newUrl: string }> = [];
+		for (const name of entries) {
+			try {
+				await fs.rename(path.join(oldPath, name), path.join(newPath, name));
+				migrated.push({ oldUrl: `/uploads/${oldDir}/${name}`, newUrl: `/uploads/${newDir}/${name}` });
+			} catch {
+				// skip
+			}
+		}
+		return migrated;
 	}
-	return migrated;
+
+	// rename: 디렉토리 통째로 이동
+	try {
+		await fs.access(oldPath);
+	} catch {
+		return []; // 원본 디렉토리 없음
+	}
+	await fs.mkdir(path.dirname(newPath), { recursive: true });
+	try {
+		await fs.rename(oldPath, newPath);
+	} catch {
+		return []; // 대상 이미 존재 등
+	}
+	// 마이그레이션 맵핑은 미사용 (본문 링크는 @@ 마커로 동적 변환)
+	return [];
 }
 
-// 본문 내 /uploads/<old> 링크를 /uploads/<new>로 일괄 치환.
+// 본문 내 /uploads/<old> 링크를 /uploads/<new>로 일괄 치환. (레거시 호환, 현재 미사용)
 export function rewriteUploadLinks(
 	content: string,
 	migrations: Array<{ oldUrl: string; newUrl: string }>,
@@ -232,20 +241,19 @@ export async function deletePage(store: Store, slug: string): Promise<void> {
 	await deleteUploadsFor(store.dataDir, slug);
 }
 
-// slug 프리픽스를 가진 업로드 파일들을 모두 삭제 (고아 방지).
+// slug 디렉토리의 업로드 파일들을 모두 삭제 (고아 방지).
 async function deleteUploadsFor(dataDir: string, slug: string): Promise<void> {
-	const prefix = encodeSlugPrefix(slug);
-	const dir = uploadsDir(dataDir);
-	let entries: string[];
+	const uploadsRoot = uploadsDir(dataDir);
+	const slugDir = slugToUploadDir(slug);
+	const dir = path.join(uploadsRoot, slugDir);
 	try {
-		entries = await fs.readdir(dir);
-	} catch {
-		return;
-	}
-	for (const name of entries) {
-		const decoded = decodeSlugPrefix(name);
-		if (encodeSlugPrefix(decoded) === prefix) {
+		const entries = await fs.readdir(dir);
+		for (const name of entries) {
 			await fs.unlink(path.join(dir, name)).catch(() => {});
 		}
+		// 빈 디렉토리 삭제
+		await fs.rmdir(dir).catch(() => {});
+	} catch {
+		// 디렉토리가 없으면 무시
 	}
 }

@@ -1,4 +1,5 @@
 import { signToken } from "./jwt.js";
+import crypto from "node:crypto";
 import type { AuthData } from "../data.js";
 import type { Store } from "../env.js";
 
@@ -22,26 +23,24 @@ export async function issueSession(store: Store, userId: number): Promise<{ toke
 }
 
 // ── API 키: 사용자당 최대 1개. 있으면 재발급, 없으면 새로 발급. ──
+// 짧은 opaque 토큰 (bk_ + base64url 24바이트). 세션은 JWT 유지.
 export async function issueApiKey(store: Store, userId: number): Promise<string> {
 	const existing = store.auth.tokens.find((t) => t.userId === userId && t.type === "api");
 	if (existing) {
 		// 기존 키 재발급: 기존 jti 폐기 + 새 키 발급
 		store.auth.tokens = store.auth.tokens.filter((t) => t.jti !== existing.jti);
 	}
-	const jti = crypto.randomUUID();
-	const token = await signToken({ jti, userId, type: "api" }, null);
-	store.auth.tokens.push({ jti, userId, type: "api", expiresAt: null, createdAt: new Date().toISOString(), lastUsedAt: null });
+	const key = "bk_" + crypto.randomBytes(24).toString("base64url");
+	store.auth.tokens.push({ jti: key, userId, type: "api", expiresAt: null, createdAt: new Date().toISOString(), lastUsedAt: null });
 	await persist(store);
-	return token;
+	return key;
 }
 
-// ── 기존 API 키 조회 (있으면 반환, 없으면 null) ──
+// ── 기존 API 키 조회 (있으면 존재 표시, 없으면 null) ──
 export function getApiKey(store: Store, userId: number): string | null {
 	const existing = store.auth.tokens.find((t) => t.userId === userId && t.type === "api");
 	if (!existing) return null;
-	// 원본 JWT는 저장하지 않으므로, 존재 여부만 확인. 실제 토큰은 발급 시에만 표시.
-	// 재발급이 필요하면 issueApiKey 호출.
-	return existing.jti; // 존재 표시용
+	return existing.jti; // 존재 표시용 (실제 키는 발급 시에만 표시)
 }
 
 // ── 토큰 유효성 확인 + lastUsedAt 갱신 ──

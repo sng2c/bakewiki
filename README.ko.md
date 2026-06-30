@@ -11,17 +11,29 @@
 - **파일시스템 기반** — `.md` 파일로 저장, Git 버전 관리 가능
 - **Title=Slug 모델** — 첫 `#` 헤딩이 페이지 제목이자 슬러그, 유니코드 지원
 - **계층 슬러그** — 디렉토리 구조로 페이지 조직화, 표준 상대 링크 지원
-- **인증** — 관리자 로그인, 세션 쿠키 + API 키 인증
-- **리다이렉트** — 슬러그 변경 시 자동 리다이렉트 매핑
+- **위키링크** — `[[slug]]` 절대 슬러그 참조, `[[slug|표시 텍스트]]` 지원
+- **이미지 업로드** — 디렉토리 기반 저장 + `@@` 콘텐츠 마커, rename 시 자동 이관
+- **인증** — 관리자 로그인, 세션 쿠키 + 짧은 API 키 (`bk_` 접두사)
 - **부분 업데이트** — PATCH API로 공개여부, 본문, 슬러그 개별 변경
-- **LLM 친화적** — 구조화된 JSON API + API 키 인증
+- **LLM 친화적** — 구조화된 JSON API + API 키 인증, 배치 CLI 조회
 
 ## 빠른 시작
+
+`npx` 사용 (설치 없이):
 
 ```bash
 npx @sng2c/bakewiki init --data ./data
 npx @sng2c/bakewiki admin create --data ./data
 npx @sng2c/bakewiki serve --data ./data
+```
+
+또는 전역 설치:
+
+```bash
+npm i -g @sng2c/bakewiki
+bakewiki init --data ./data
+bakewiki admin create --data ./data
+bakewiki serve --data ./data
 ```
 
 http://127.0.0.1:3000 열기.
@@ -61,7 +73,7 @@ bakewiki remote [options] <command>
 | 명령 | 설명 | 인증 |
 |------|------|------|
 | `list` | 문서 목록 | 필수 |
-| `get <slug>` | 문서 조회 | 필수 |
+| `get <slug> [slug2 ...]` | 문서 조회 — 배치 지원 | 필수 |
 | `create <slug> <file>` | 문서 생성/수정 | 필수 |
 | `rename <old> <new>` | 문서 이름 변경 | 필수 |
 | `patch <slug> [--slug ...] [--public ...] [--body ...]` | 부분 업데이트 | 필수 |
@@ -106,7 +118,6 @@ data/
 │           └── HTTP.md
 ├── auth.json        ← 사용자 + 토큰
 ├── config.yml       ← JWT 시크릿 (자동 생성)
-└── redirects.json   ← 슬러그 변경 리다이렉트 매핑
 ```
 
 ### 마크다운 형식
@@ -131,6 +142,8 @@ public: true
   - 슬러그 `tech/web/HTTP`에서 `CSS` → `tech/web/CSS` (형제)
   - 슬러그 `tech/web/HTTP`에서 `../API` → `tech/API` (삼촌)
   - 슬러그 `tech/web/HTTP`에서 `./HTTP/HTTPS` → `tech/web/HTTP/HTTPS` (자식)
+- **위키링크**: `[[slug]]` → `/pages/slug` (절대). `[[slug|표시 텍스트]]`로 링크 텍스트 지정.
+- **업로드 마커**: 본문의 `@@파일명` → 렌더링 시 `/uploads/<현재-slug>/파일명`으로 동적 변환. 페이지 rename 시 업로드 디렉토리만 rename, 본문은 그대로.
 
 ## API
 
@@ -174,11 +187,6 @@ GET /api/pages/:slug
 }
 ```
 
-응답 `301` (리다이렉트):
-```json
-{ "redirect": "new-slug" }
-```
-
 응답 `404`: `{ "error": "Not found" }`
 
 미인증 요청은 비공개 문서에 대해 404 반환.
@@ -218,10 +226,12 @@ Authorization: Bearer <api-key>
 { "body": "# 수정된 제목\n\n새 내용" }
 ```
 
-이름 변경 (기존 rename):
+이름 변경:
 ```json
 { "slug": "new-slug" }
 ```
+
+참고: 이름 변경 시 리다이렉트가 생성되지 않습니다. 이전 슬러그는 404를 반환합니다.
 
 복합 변경:
 ```json
@@ -271,15 +281,14 @@ GET /api/sitemap
 ```json
 {
   "tree": [
-    { "slug": "index", "children": [] },
-    { "slug": "docs", "children": [
-      { "slug": "docs/api", "children": [] }
-    ] }
+    { "slug": "index", "title": "홈", "isPublic": true, "children": [
+      { "slug": "docs/api", "title": "API 문서", "isPublic": false, "children": [] }
+    ]}
   ]
 }
 ```
 
-모든 문서의 계층 트리. 미인증 요청은 공개 문서만 포함.
+모든 문서의 계층 트리 (title, isPublic 포함). 미인증 요청은 공개 문서만 포함.
 
 ### 상태 확인
 
@@ -291,14 +300,57 @@ GET /api/health
 
 인증 불필요.
 
+### 업로드
+
+#### 파일 업로드
+
+```
+POST /api/upload
+Content-Type: multipart/form-data
+Authorization: Bearer <api-key>
+
+file: <binary>
+slug: <페이지-slug>
+```
+
+응답 `200`:
+```json
+{ "url": "/uploads/tech/web/HTTP/photo.jpg", "filename": "tech/web/HTTP/photo.jpg", "original": "photo.jpg", "ext": "jpg", "slug": "tech/web/HTTP", "size": 12345 }
+```
+
+파일은 `uploads/<slug>/<original>`에 저장. 본문에서 `@@<original>`로 참조 (렌더링 시 동적 변환).
+
+#### 업로드 목록
+
+```
+GET /api/upload              — 전체 (인증 필요)
+GET /api/upload/by-slug/:slug — 특정 페이지 (공개)
+```
+
+응답 `200`:
+```json
+{ "files": [{ "url": "/uploads/index/photo.jpg", "filename": "index/photo.jpg", "original": "photo.jpg", "ext": "jpg", "slug": "index", "size": 12345 }] }
+```
+
+#### 업로드 삭제
+
+```
+DELETE /api/upload/:filename
+Authorization: Bearer <api-key>
+```
+
+`filename`은 `<slug>/<original>` (예: `index/photo.jpg`).
+
+응답 `200`: `{ "ok": true }`
+
 ### 슬러그 규칙
 
 - 앞뒤 `/` 금지
 - `..` 세그먼트 금지
 - 유니코드 지원 (예: `히히`, `파일들`)
 - `tech/web/HTTP` 형태의 계층 슬러그
-- `index` 슬러그는 홈페이지로 예약
-- 슬러그 변경 시 `redirects.json`에 리다이렉트 추적
+- `index` 슬러그는 홈페이지 (`/`에서 서빙)
+- 슬러그 변경 시 기존 URL은 404 (리다이렉트 없음)
 
 ## 개발
 

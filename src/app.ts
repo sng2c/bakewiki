@@ -24,6 +24,11 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 	});
 	app.use("*", auth);
 
+	// 캐시 제어: 동적 데이터(HTML/API)만 no-cache, 정적 자산은 캐시 허용
+	app.use("/pages/*", async (c, next) => { await next(); c.header("Cache-Control", "no-cache, no-store, must-revalidate"); });
+	app.use("/api/*", async (c, next) => { await next(); c.header("Cache-Control", "no-cache, no-store, must-revalidate"); });
+	app.get("/", async (c, next) => { await next(); c.header("Cache-Control", "no-cache, no-store, must-revalidate"); });
+
 	// 헬스체크
 	app.get("/api/health", (c) => c.json({ ok: true }));
 
@@ -56,7 +61,7 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 		const user = c.get("user");
 		const store = c.get("store");
 		const list = await listPages(store, !!user);
-		const tree = buildSitemapTree(list.map((p) => p.slug));
+		const tree = buildSitemapTree(list);
 		return c.json({ tree });
 	});
 
@@ -69,23 +74,31 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 	return app;
 }
 
-// slug 목록 → 계층 트리 구조
+// slug 목록 → 계층 트리 구조 (title, isPublic 포함)
 interface SitemapNode {
 	slug: string;
+	title?: string;
+	isPublic?: boolean;
 	children: SitemapNode[];
 }
 
-function buildSitemapTree(slugs: string[]): SitemapNode[] {
+function buildSitemapTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>): SitemapNode[] {
 	const root: SitemapNode[] = [];
-	for (const slug of slugs) {
-		const parts = slug.split("/");
+	for (const page of pages) {
+		const parts = page.slug.split("/");
 		let nodes = root;
 		for (let i = 0; i < parts.length; i++) {
 			const part = parts[i];
-			let node = nodes.find((n) => n.slug === (i < parts.length - 1 ? parts.slice(0, i + 1).join("/") : slug));
+			const isLast = i === parts.length - 1;
+			const fullSlug = isLast ? page.slug : parts.slice(0, i + 1).join("/");
+			let node = nodes.find((n) => n.slug === fullSlug);
 			if (!node) {
-				node = { slug: i < parts.length - 1 ? parts.slice(0, i + 1).join("/") : slug, children: [] };
+				node = { slug: fullSlug, children: [] };
 				nodes.push(node);
+			}
+			if (isLast) {
+				node.title = page.title;
+				node.isPublic = page.isPublic;
 			}
 			nodes = node.children;
 		}

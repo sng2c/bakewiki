@@ -41,18 +41,60 @@
 		return dir ? dir + '/' + slugPart : slugPart;
 	}
 
+	// Current page slug: use originalSlug for existing pages, computeSlug for new pages.
+	function currentSlug() {
+		if (originalSlug && originalSlug.value) return originalSlug.value;
+		return computeSlug();
+	}
+
+	// Slug → upload directory path (strip leading/trailing /, keep internal /)
+	function slugToUploadDir(slug) {
+		if (!slug) return '_';
+		return slug.replace(/^\/+|\/+$/g, '');
+	}
+
+	// Resolve a wiki-link target to a URL. Absolute slug only.
+	function resolveWikiLink(target) {
+		return '/pages/' + target;
+	}
+
+	// Wiki-link rule: [[target]] or [[target|display]]
+	md.inline.ruler.before('link', 'wikilink', function (state, silent) {
+		var src = state.src.slice(state.pos);
+		var match = src.match(/^\[\[([^\]]+)\]\]/);
+		if (!match) return false;
+		if (!silent) {
+			var parts = match[1].split('|');
+			var target = parts[0].trim();
+			var display = parts.length > 1 ? parts[1].trim() : target;
+			var url = resolveWikiLink(target);
+			var token = state.push('link_open', 'a', 1);
+			token.attrs = [['href', url]];
+			token = state.push('text', '', 0);
+			token.content = display;
+			state.push('link_close', 'a', -1);
+		}
+		state.pos += match[0].length;
+		return true;
+	});
+
 	// Link resolution: standard URL — relative links resolve against parent directory.
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
+		// @@<file> marker → upload reference, resolve with current slug
+		if (url.startsWith('@@')) {
+			var ufile = url.slice(2);
+			return defaultNormalizeLink('/uploads/' + slugToUploadDir(currentSlug()) + '/' + ufile);
+		}
 		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url);
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
 		// Relative URL: resolve against parent directory of current slug
-		var currentSlug = computeSlug() || (originalSlug ? originalSlug.value : '');
-		if (currentSlug) {
-			var slashIdx = currentSlug.lastIndexOf('/');
-			var dir = slashIdx >= 0 ? currentSlug.substring(0, slashIdx) : '';
+		var slug = currentSlug();
+		if (slug) {
+			var slashIdx = slug.lastIndexOf('/');
+			var dir = slashIdx >= 0 ? slug.substring(0, slashIdx) : '';
 			var parts = (dir ? dir.split('/') : []).concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
@@ -96,7 +138,7 @@
 	async function uploadImage(file) {
 		var fd = new FormData();
 		fd.append('file', file);
-		fd.append('slug', computeSlug() || (originalSlug ? originalSlug.value : ''));
+		fd.append('slug', currentSlug());
 		var r = await fetch('/api/upload', { method: 'POST', body: fd });
 		if (!r.ok) {
 			var j = await r.json().catch(function () {});
@@ -140,7 +182,7 @@
 
 		var name = document.createElement('small');
 		name.textContent = item.original;
-		name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+		name.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
 
 		var insertBtn = document.createElement('button');
 		insertBtn.type = 'button';
@@ -160,7 +202,9 @@
 		});
 
 		function doInsert() {
-			var md = isImage ? '\n![](' + item.url + ')\n' : '\n[' + item.original + '](' + item.url + ')\n';
+			// Use @@ marker — resolved at render time with current slug
+			var neutralUrl = '@@' + item.original;
+			var md = isImage ? '\n![](' + neutralUrl + ')\n' : '\n[' + item.original + '](' + neutralUrl + ')\n';
 			insertAtCursor(md);
 		}
 		preview.addEventListener('click', doInsert);
@@ -198,9 +242,11 @@
 		}
 	});
 
-	// ── Load existing uploads ──
+	// ── Load existing uploads (filtered by current page slug) ──
 	if (listEl) {
-		fetch('/api/upload').then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+		var loadSlug = currentSlug();
+		var url = loadSlug ? '/api/upload/by-slug/' + encodeURIComponent(loadSlug) : '/api/upload';
+		fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
 			if (data && data.files) {
 				for (var i = 0; i < data.files.length; i++) appendUpload(data.files[i]);
 			}

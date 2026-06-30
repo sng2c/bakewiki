@@ -6,47 +6,33 @@ import type { AuthUser } from "../env.js";
 import { requireAuth } from "../auth/middleware.js";
 import { uploadsDir } from "../data.js";
 
-// Upload domain. Flat storage with slug-prefixed original filenames.
-// File: uploads/<slug-encoded>@@<original-filename>
-//   - slug "tech/web/http" → "tech__web__http" (/ → __ to keep flat, no subdir)
-//   - "@@" separates the slug prefix from the original filename (slug may contain "-")
-//   - original filename preserved (collision = overwrite)
-//   - new page (no slug yet) → "_" temporary bucket, moved to real slug on save (web/edit.ts)
+// Upload domain. Directory-based storage: one folder per slug.
+// File: uploads/<slug>/<original-filename>
+//   - slug "tech/web/http" → uploads/tech/web/http/photo.jpg (nested dirs mirror page hierarchy)
+//   - original filename preserved (collision = overwrite within same slug)
+//   - new page (no slug yet) → uploads/_/<original> (shared temp bucket, moved on save)
 // /uploads/* served publicly by serveStatic in app.ts.
+// Content uses @@<original> marker, resolved to /uploads/<slug>/<original> at render time.
 
-const SEPARATOR = "@@";
+const TEMP_BUCKET = "_";
 
-// Encode slug for use as a filename prefix. "/" → "__", strip leading/trailing "/".
-export function encodeSlugPrefix(slug: string): string {
-	if (!slug) return "_";
-	const trimmed = slug.replace(/^\/+|\/+$/g, "");
-	if (!trimmed) return "_";
-	return trimmed.replace(/\//g, "__");
+// Slug → directory path relative to uploads root. Empty slug → temp bucket.
+export function slugToUploadDir(slug: string): string {
+	if (!slug) return TEMP_BUCKET;
+	return slug.replace(/^\/+|\/+$/g, "");
 }
 
-// Decode a slug-prefixed filename back to its slug. Returns "" if no prefix or for "_" bucket.
-export function decodeSlugPrefix(filename: string): string {
-	const idx = filename.indexOf(SEPARATOR);
-	if (idx <= 0) return "";
-	const prefix = filename.slice(0, idx);
-	if (prefix === "_") return "";
-	return prefix.replace(/__/g, "/");
+// Reverse: directory path → slug. Temp bucket → "".
+export function dirToSlug(dir: string): string {
+	if (dir === TEMP_BUCKET) return "";
+	return dir;
 }
 
-// Extract the original filename (after the separator) from a stored filename.
-export function extractOriginal(filename: string): string {
-	const idx = filename.indexOf(SEPARATOR);
-	return idx >= 0 ? filename.slice(idx + SEPARATOR.length) : filename;
-}
-
-// Validate a stored filename: must contain the separator and forbid path traversal.
-// Original part may contain most chars but not "/" or "\" or ".." segments.
-function isValidStoredName(name: string | undefined): name is string {
-	if (!name) return false;
-	if (name.includes("/") || name.includes("\\")) return false;
-	if (name.includes("..")) return false;
-	const sepIdx = name.indexOf(SEPARATOR);
-	if (sepIdx <= 0) return false; // must have non-empty prefix before separator
+// Validate a slug for use as a directory path: forbid "..", "\", leading/trailing "/".
+function isValidSlugDir(slugDir: string | undefined): slugDir is string {
+	if (!slugDir) return false;
+	if (slugDir.includes("..") || slugDir.includes("\\")) return false;
+	if (slugDir.startsWith("/") || slugDir.endsWith("/")) return false;
 	return true;
 }
 
@@ -58,17 +44,22 @@ function extractExt(filename: string): string {
 
 // Sanitize an original filename: strip directory components, forbid traversal.
 function sanitizeOriginal(name: string): string {
-	// take basename only
 	const base = path.basename(name);
-	// collapse any remaining path-like chars defensively
 	return base.replace(/[\\/]+/g, "");
+}
+
+// Validate an original filename: no path separators, no "..", must have extension.
+function isValidOriginal(name: string): boolean {
+	if (!name || name.includes("/") || name.includes("\\") || name.includes("..")) return false;
+	if (!name.includes(".") || name.indexOf(".") === 0) return false;
+	return true;
 }
 
 export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
 	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
 	// Single file upload. Admin only. Any extension allowed. Collision = overwrite.
-	// multipart/form-data: file (File), slug (string, optional — "_" for new pages)
+	// multipart/form-data: file (File), slug (string, optional — temp bucket for new pages)
 	app.post("/", requireAuth, async (c) => {
 		const body = await c.req.parseBody();
 		const file = body.file;
@@ -82,26 +73,25 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 
 		const slug = typeof body.slug === "string" ? body.slug.trim() : "";
 		const original = sanitizeOriginal(file.name);
-		if (!original || !original.includes(".") || original.indexOf(".") === 0) {
+		if (!isValidOriginal(original)) {
 			return c.json({ error: "Filename must have a name and extension" }, 400);
 		}
 
-		const prefix = encodeSlugPrefix(slug);
-		const filename = `${prefix}${SEPARATOR}${original}`;
+		const slugDir = slugToUploadDir(slug);
 		const store = c.get("store");
-		const dir = uploadsDir(store.dataDir);
+		const dir = path.join(uploadsDir(store.dataDir), slugDir);
 		await fs.mkdir(dir, { recursive: true });
-		const fullPath = path.join(dir, filename);
+		const fullPath = path.join(dir, original);
 
 		const buf = Buffer.from(await file.arrayBuffer());
 		await fs.writeFile(fullPath, buf); // overwrite on collision
 
-		const ext = extractExt(filename);
-		const url = `/uploads/${filename}`;
-		return c.json({ url, filename, ext, slug, size: file.size });
+		const ext = extractExt(original);
+		const url = `/uploads/${slugDir}/${original}`;
+		return c.json({ url, filename: `${slugDir}/${original}`, original, ext, slug, size: file.size });
 	});
 
-	// All uploads list. Admin only. (editor.js loads on start for the _ session bucket)
+	// All uploads list. Admin only.
 	app.get("/", requireAuth, async (c) => {
 		const store = c.get("store");
 		const files = await listUploadsFor(store.dataDir, undefined);
@@ -109,7 +99,6 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 	});
 
 	// Uploads for a specific slug. Public-readable for the attachments section on read pages.
-	// Returns only files whose slug prefix decodes to :slug.
 	app.get("/by-slug/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug");
 		const store = c.get("store");
@@ -117,14 +106,21 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 		return c.json({ files });
 	});
 
-	// Delete. Admin only.
+	// Delete. Admin only. filename is <slugDir>/<original>.
 	app.delete("/:filename{.+}", requireAuth, async (c) => {
 		const filename = c.req.param("filename");
-		if (!isValidStoredName(filename)) {
+		// Validate: split into dir + original, both must be valid
+		const lastSlash = filename ? filename.lastIndexOf("/") : -1;
+		if (lastSlash < 0) {
+			return c.json({ error: "Invalid filename" }, 400);
+		}
+		const slugDir = filename!.slice(0, lastSlash);
+		const original = filename!.slice(lastSlash + 1);
+		if (!isValidSlugDir(slugDir) || !isValidOriginal(original)) {
 			return c.json({ error: "Invalid filename" }, 400);
 		}
 		const store = c.get("store");
-		const fullPath = path.join(uploadsDir(store.dataDir), filename);
+		const fullPath = path.join(uploadsDir(store.dataDir), slugDir, original);
 		try {
 			await fs.unlink(fullPath);
 		} catch {
@@ -136,40 +132,82 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 	return app;
 }
 
-// List uploads, optionally filtered by decoded slug.
-// Filters by visibility: if not authed, private pages' uploads are still listed (uploads are public).
+// Build the full file URL from slug + original.
+export function buildUploadUrl(slug: string, original: string): string {
+	const slugDir = slugToUploadDir(slug);
+	return `/uploads/${slugDir}/${original}`;
+}
+
+// List uploads, optionally filtered by slug.
 async function listUploadsFor(
 	dataDir: string,
 	slug: string | undefined,
 ): Promise<Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }>> {
-	const dir = uploadsDir(dataDir);
-	let entries: string[];
-	try {
-		entries = await fs.readdir(dir);
-	} catch {
-		return [];
-	}
-	const targetPrefix = slug !== undefined ? encodeSlugPrefix(slug) : null;
+	const uploadsRoot = uploadsDir(dataDir);
 	const files: Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }> = [];
-	for (const name of entries) {
-		if (!isValidStoredName(name)) continue;
-		const decodedSlug = decodeSlugPrefix(name);
-		if (targetPrefix !== null) {
-			const decodedPrefix = encodeSlugPrefix(decodedSlug);
-			if (decodedPrefix !== targetPrefix) continue;
-		}
+
+	if (slug !== undefined) {
+		// List files in a specific slug's directory
+		const slugDir = slugToUploadDir(slug);
+		const dir = path.join(uploadsRoot, slugDir);
+		let entries: string[];
 		try {
-			const stat = await fs.stat(path.join(dir, name));
-			files.push({
-				url: `/uploads/${name}`,
-				filename: name,
-				original: extractOriginal(name),
-				ext: extractExt(name),
-				slug: decodedSlug,
-				size: stat.size,
-			});
+			entries = await fs.readdir(dir);
 		} catch {
-			// skip
+			return [];
+		}
+		for (const name of entries) {
+			if (!isValidOriginal(name)) continue;
+			try {
+				const stat = await fs.stat(path.join(dir, name));
+				files.push({
+					url: `/uploads/${slugDir}/${name}`,
+					filename: `${slugDir}/${name}`,
+					original: name,
+					ext: extractExt(name),
+					slug,
+					size: stat.size,
+				});
+			} catch {
+				// skip
+			}
+		}
+	} else {
+		// List all: walk subdirectories
+		let topEntries: import("node:fs").Dirent[];
+		try {
+			topEntries = await fs.readdir(uploadsRoot, { withFileTypes: true });
+		} catch {
+			return [];
+		}
+		for (const entry of topEntries) {
+			if (!entry.isDirectory()) continue;
+			const slugDir = entry.name;
+			if (!isValidSlugDir(slugDir)) continue;
+			const decodedSlug = dirToSlug(slugDir);
+			const dir = path.join(uploadsRoot, slugDir);
+			let entries: string[];
+			try {
+				entries = await fs.readdir(dir);
+			} catch {
+				continue;
+			}
+			for (const name of entries) {
+				if (!isValidOriginal(name)) continue;
+				try {
+					const stat = await fs.stat(path.join(dir, name));
+					files.push({
+						url: `/uploads/${slugDir}/${name}`,
+						filename: `${slugDir}/${name}`,
+						original: name,
+						ext: extractExt(name),
+						slug: decodedSlug,
+						size: stat.size,
+					});
+				} catch {
+					// skip
+				}
+			}
 		}
 	}
 	files.sort((a, b) => b.filename.localeCompare(a.filename));

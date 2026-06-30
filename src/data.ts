@@ -46,10 +46,6 @@ export function configPath(dataDir: string): string {
 	return path.join(dataDir, "config.yml");
 }
 
-export function redirectsPath(dataDir: string): string {
-	return path.join(dataDir, "redirects.json");
-}
-
 export async function initDataDir(dataDir: string): Promise<void> {
 	await fs.mkdir(pagesDir(dataDir), { recursive: true });
 	await fs.mkdir(uploadsDir(dataDir), { recursive: true });
@@ -90,22 +86,6 @@ export async function writeConfig(dataDir: string, config: Config): Promise<void
 
 function generateSecret(): string {
 	return crypto.randomBytes(32).toString("hex");
-}
-
-// ── 리다이렉트 매핑 (old slug → new slug) ──
-export type Redirects = Record<string, string>;
-
-export async function readRedirects(dataDir: string): Promise<Redirects> {
-	try {
-		const content = await fs.readFile(redirectsPath(dataDir), "utf-8");
-		return JSON.parse(content);
-	} catch {
-		return {};
-	}
-}
-
-export async function writeRedirects(dataDir: string, redirects: Redirects): Promise<void> {
-	await fs.writeFile(redirectsPath(dataDir), JSON.stringify(redirects, null, 2), "utf-8");
 }
 
 // ── 인증 데이터 타입 ──

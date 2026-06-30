@@ -42,7 +42,7 @@ async function walkAndIndex(root: string, dir: string): Promise<void> {
 				const doc = parseDocument(content);
 				const title = extractTitle(doc) ?? "";
 				const isPublic = extractPublic(doc);
-				index.set(slug, { title, content, isPublic, updatedAt: stat.mtime.toISOString() });
+				index.set(slug, { title, content: doc.body, isPublic, updatedAt: stat.mtime.toISOString() });
 			} catch {
 				// 읽기 실패 시 스킵
 			}

@@ -34,9 +34,6 @@ export class BakewikiClient {
 
 	async getPage(slug: string): Promise<{ slug: string; title: string; public: boolean; updatedAt: string; content: string }> {
 		const { ok, status, data } = await this.request("GET", `/api/pages/${slug}`);
-		if (status === 301 && data && typeof data === "object" && "redirect" in data) {
-			throw new Error(`Page moved: ${slug} → ${(data as { redirect: string }).redirect}. Use the new slug.`);
-		}
 		if (!ok) throw new Error(`Page not found: ${slug}`);
 		const page = (data as { page: { slug: string; title: string; isPublic: boolean; updatedAt: string; content: string } }).page;
 		return { slug: page.slug, title: page.title, public: page.isPublic, updatedAt: page.updatedAt, content: page.content };
@@ -112,6 +109,20 @@ export class BakewikiClient {
 		const { ok, data } = await this.request("DELETE", `/api/upload/${encodeURIComponent(filename)}`);
 		if (!ok) throw new Error(`Failed to delete file: ${JSON.stringify(data)}`);
 	}
+
+	async listFilesBySlug(slug: string): Promise<{ url: string; filename: string; original: string; ext: string; size: number }[]> {
+		const { ok, data } = await this.request("GET", `/api/upload/by-slug/${encodeURIComponent(slug)}`);
+		if (!ok) throw new Error(`Failed to list files: ${JSON.stringify(data)}`);
+		return (data as { files: { url: string; filename: string; original: string; ext: string; size: number }[] }).files;
+	}
+
+	async downloadFile(url: string): Promise<Buffer> {
+		const res = await fetch(`${this.baseUrl}${url}`, {
+			headers: { Authorization: `Bearer ${this.apiKey}` },
+		});
+		if (!res.ok) throw new Error(`Failed to download: ${res.status}`);
+		return Buffer.from(await res.arrayBuffer());
+	}
 }
 
 // ── Remote options parsing ──
@@ -173,33 +184,30 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 				console.log("No pages.");
 				return;
 			}
-			// table header
-			const maxSlug = Math.max(4, ...pages.map((p) => p.slug.length));
-			const maxTitle = Math.max(5, ...pages.map((p) => p.title.length));
-			console.log(`${"SLUG".padEnd(maxSlug)}  ${"TITLE".padEnd(maxTitle)}  VIS  UPDATED`);
-			for (const p of pages) {
-				const vis = p.public ? "pub" : "pri";
-				const date = p.updatedAt.slice(0, 10);
-				console.log(`${p.slug.padEnd(maxSlug)}  ${p.title.padEnd(maxTitle)}  ${vis}  ${date}`);
-			}
+			// 트리 구조로 출력 (디렉토리별 그룹)
+			printPageTree(pages);
 			break;
 		}
 
 		case "get": {
 			validateKey(opts.key);
-			const slug = rest[0];
-			if (!slug) {
-				console.error("Usage: bakewiki pages get <slug>");
+			const slugs = rest;
+			if (slugs.length === 0) {
+				console.error("Usage: bakewiki remote get <slug> [slug2 slug3 ...]");
 				process.exit(1);
 			}
 			const client = new BakewikiClient(opts.url, opts.key);
-			const page = await client.getPage(slug);
-			console.log(`slug:    ${page.slug}`);
-			console.log(`title:   ${page.title}`);
-			console.log(`public:  ${page.public}`);
-			console.log(`updated: ${page.updatedAt}`);
-			console.log("---");
-			console.log(page.content);
+			for (let i = 0; i < slugs.length; i++) {
+				const page = await client.getPage(slugs[i]);
+				const body = stripFrontmatter(page.content);
+				if (i > 0) console.log("----");
+				console.log(`slug:    ${page.slug}`);
+				console.log(`title:   ${page.title}`);
+				console.log(`public:  ${page.public}`);
+				console.log(`updated: ${page.updatedAt.slice(0, 10)}`);
+				console.log("---");
+				console.log(body.trimEnd());
+			}
 			break;
 		}
 
@@ -293,27 +301,34 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 				console.log("No results.");
 				return;
 			}
-			for (const r of results) {
-				console.log(`${r.slug}  ${r.title}`);
-				const snippet = r.snippet.replace(/<[^>]+>/g, "");
-				if (snippet) console.log(`  ${snippet}`);
+			for (let i = 0; i < results.length; i++) {
+				const r = results[i];
+				const snippet = stripFrontmatter(r.snippet).replace(/<[^>]+>/g, "").trim();
+				if (i > 0) console.log("----");
+				console.log(`slug:    ${r.slug}`);
+				console.log(`title:   ${r.title}`);
+				if (snippet) console.log(`snippet: ${snippet}`);
 			}
+			console.log(`----`);
+			console.log(`${results.length} results`);
 			break;
 		}
 
 		case "sitemap": {
 			const client7 = new BakewikiClient(opts.url, opts.key);
 			const tree = await client7.sitemap();
-			function printTree(nodes: { slug: string; children?: Record<string, unknown> }[], depth = 0) {
+			function printSitemap(nodes: { slug: string; title?: string; isPublic?: boolean; children?: Record<string, unknown> }[], depth = 0) {
 				for (const node of nodes) {
-					console.log(`${"  ".repeat(depth)}${node.slug}`);
+					const title = node.title || node.slug.split("/").pop() || node.slug;
+					const vis = node.isPublic === false ? " 🔒" : "";
+					console.log(`${"  ".repeat(depth)}${title}${vis}  (${node.slug})`);
 					if (node.children) {
-						const childNodes = Object.values(node.children) as { slug: string; children?: Record<string, unknown> }[];
-						printTree(childNodes, depth + 1);
+						const childNodes = Object.values(node.children) as { slug: string; title?: string; isPublic?: boolean; children?: Record<string, unknown> }[];
+						printSitemap(childNodes, depth + 1);
 					}
 				}
 			}
-			printTree(tree);
+			printSitemap(tree);
 			break;
 		}
 
@@ -337,8 +352,15 @@ async function fileCommand(sub: string | undefined, args: string[], opts: Remote
 		case "list":
 		case "ls": {
 			validateKey(opts.key);
+			// Optional --slug
+			let listSlug = "";
+			const listArgs = args.filter(function (a, i) {
+				if (a === "--slug") { listSlug = args[i + 1] || ""; return false; }
+				if (args[i - 1] === "--slug") return false;
+				return true;
+			});
 			const client = new BakewikiClient(opts.url, opts.key);
-			const files = await client.listFiles();
+			const files = listSlug ? await client.listFilesBySlug(listSlug) : await client.listFiles();
 			if (files.length === 0) {
 				console.log("No files.");
 				return;
@@ -403,11 +425,104 @@ async function fileCommand(sub: string | undefined, args: string[], opts: Remote
 			break;
 		}
 
+		case "download":
+		case "dl": {
+			validateKey(opts.key);
+			const dlInput = args[0];
+			const output = args[1];
+			if (!dlInput) {
+				console.error("Usage: bakewiki remote file download <url|filename> [output|-");
+				process.exit(1);
+			}
+			const client = new BakewikiClient(opts.url, opts.key);
+			// /uploads/로 시작하지 않으면 파일명으로 간주
+			const fileUrl = dlInput.startsWith("/uploads/") ? dlInput : `/uploads/${dlInput}`;
+			const data = await client.downloadFile(fileUrl);
+			if (!output || output === "-") {
+				process.stdout.write(data);
+			} else {
+				const fs = await import("node:fs/promises");
+				const path = await import("node:path");
+				const outPath = path.resolve(output);
+				await fs.writeFile(outPath, data);
+				console.log(`Downloaded: ${outPath} (${formatSize(data.length)})`);
+			}
+			break;
+		}
+
 		default:
 			console.error(`Unknown file subcommand: ${sub}`);
-			console.error("Available: list, upload, delete");
+			console.error("Available: list, upload, download, delete");
 			process.exit(1);
 	}
+}
+
+// frontmatter 제거하고 본문만 반환.
+function stripFrontmatter(content: string): string {
+	const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
+	return match ? match[1] : content;
+}
+
+// 페이지 목록을 디렉토리 트리로 출력.
+function printPageTree(pages: Array<{ slug: string; title: string; public: boolean; updatedAt: string }>): void {
+	type TreeNode = {
+		name: string;
+		slug?: string;
+		title?: string;
+		isPublic?: boolean;
+		isPage: boolean;
+		children: Map<string, TreeNode>;
+	};
+
+	const root: TreeNode = { name: "", isPage: false, children: new Map() };
+	for (const page of pages) {
+		const segments = page.slug.split("/");
+		let node = root;
+		for (let i = 0; i < segments.length; i++) {
+			const seg = segments[i];
+			const isLast = i === segments.length - 1;
+			if (!node.children.has(seg)) {
+				node.children.set(seg, { name: seg, isPage: false, children: new Map() });
+			}
+			const child = node.children.get(seg)!;
+			if (isLast) {
+				child.isPage = true;
+				child.slug = page.slug;
+				child.title = page.title;
+				child.isPublic = page.public;
+			}
+			node = child;
+		}
+	}
+
+	function flatten(n: TreeNode, depth: number, prefix: string): void {
+		const dirs: TreeNode[] = [];
+		const leafPages: TreeNode[] = [];
+		for (const child of n.children.values()) {
+			if (child.children.size > 0) dirs.push(child);
+			else leafPages.push(child);
+		}
+		dirs.sort((a, b) => a.name.localeCompare(b.name));
+		leafPages.sort((a, b) => a.name.localeCompare(b.name));
+
+		for (const d of dirs) {
+			const dirPath = prefix ? prefix + "/" + d.name : d.name;
+			const indent = "  ".repeat(depth);
+			if (d.isPage) {
+				const vis = d.isPublic === false ? " 🔒" : "";
+				console.log(`${indent}${d.title || d.name}${vis}  (${d.slug})`);
+			} else {
+				console.log(`${indent}${d.name}  (${dirPath})`);
+			}
+			flatten(d, depth + 1, dirPath);
+		}
+		for (const p of leafPages) {
+			const indent = "  ".repeat(depth);
+			const vis = p.isPublic === false ? " 🔒" : "";
+			console.log(`${indent}${p.title || p.name}${vis}  (${p.slug})`);
+		}
+	}
+	flatten(root, 0, "");
 }
 
 function formatSize(bytes: number): string {

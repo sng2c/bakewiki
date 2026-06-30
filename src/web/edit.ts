@@ -17,16 +17,14 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		return `${directory}/${slugPart}`;
 	}
 
-	// 디렉토리 추출: 슬러그에서 마지막 세그먼트 제거. index/루트는 빈 문자열.
+	// 디렉토리 추출: 슬러그에서 마지막 세그먼트 제거.
 	function extractDirectory(slug: string): string {
-		if (slug === "index") return "";
 		const idx = slug.lastIndexOf("/");
 		return idx < 0 ? "" : slug.slice(0, idx);
 	}
 
 	// 슬러그에서 마지막 세그먼트(=파일명 부분) 추출
 	function extractLastSegment(slug: string): string {
-		if (slug === "index") return "index";
 		const idx = slug.lastIndexOf("/");
 		return idx < 0 ? slug : slug.slice(idx + 1);
 	}
@@ -44,8 +42,10 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const store = c.get("store");
 		const page = await getPage(store, slug);
 		if (!page) {
+			const lastSeg = extractLastSegment(slug);
+			const defaultBody = lastSeg ? `# ${lastSeg}\n\n` : "";
 			return c.html(renderTemplate("editor", {
-				page: null, slug, directory: extractDirectory(slug), public: true, body: "",
+				page: null, slug, directory: extractDirectory(slug), public: true, body: defaultBody,
 			}, { title: "New page", user: true, q: "", needsRender: true }));
 		}
 		const doc = parseDocument(page.content);
@@ -72,15 +72,9 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		let slug: string;
 		if (originalSlug) {
 			// 기존 문서 편집 — 디렉토리 + 타이틀에서 새 슬러그 계산
-			// index 특수 케이스: 슬러그 유지
-			if (originalSlug === "index") {
-				slug = "index";
-			} else {
-				const titlePart = title ? deriveSlugFromTitle(title) : extractLastSegment(originalSlug);
-				slug = titlePart ? computeSlug(directory, title!) : originalSlug;
-				// 타이틀이 없으면 원래 슬러그 유지
-				if (!slug) slug = originalSlug;
-			}
+			const titlePart = title ? deriveSlugFromTitle(title) : extractLastSegment(originalSlug);
+			slug = titlePart ? computeSlug(directory, title!) : originalSlug;
+			if (!slug) slug = originalSlug;
 		} else {
 			// 새 문서 — 디렉토리 + 타이틀에서 슬러그 유도
 			if (title) {
@@ -94,13 +88,13 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		if (title) {
 			body = ensureHeading(body, title);
 		}
-		const content = buildDocument(isPublic, body);
+		let content = buildDocument(isPublic, body);
 		const store = c.get("store");
 
 		if (originalSlug) {
 			// 기존 문서 편집
 			if (slug !== originalSlug) {
-				// 슬러그 변경 → rename + 콘텐츠 업데이트
+				// 슬러그 변경 → rename (업로드 파일 이관만, 본문 링크는 동적 변환됨)
 				const renamed = await renamePage(store, originalSlug, slug);
 				if (!renamed) {
 					// 대상 슬러그가 이미 존재하면 원래 슬러그로 되돌림

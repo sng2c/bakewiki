@@ -4,7 +4,6 @@ import type { AuthUser } from "../env.js";
 import { requireAuth } from "../auth/middleware.js";
 import { createPage, updatePage, getPage, deletePage, renamePage, listPages } from "../pages/store.js";
 import { parseDocument, extractPublic, buildDocument } from "../pages/frontmatter.js";
-import { readRedirects } from "../data.js";
 
 // slug 검증: 빈 문자열, "..", 선행/후행 "/" 금지
 function validSlug(slug: string | undefined): slug is string {
@@ -31,13 +30,6 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 			return c.json({ error: "Invalid slug" }, 400);
 		}
 		const store = c.get("store");
-
-		// 리다이렉트 확인
-		const redirects = await readRedirects(store.dataDir);
-		const redirectTo = redirects[slug];
-		if (redirectTo) {
-			return c.json({ redirect: redirectTo }, 301);
-		}
 
 		const page = await getPage(store, slug);
 		if (!page) return c.json({ error: "Not found" }, 404);
