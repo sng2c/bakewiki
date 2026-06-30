@@ -32,7 +32,8 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 	if (!page) return null;
 	if (!page.isPublic && !authed) return null;
 	const doc = parseDocument(page.content);
-	const title = extractTitle(doc) ?? page.slug;
+	const extractedTitle = extractTitle(doc) ?? "";
+	const title = extractedTitle;
 	const breadcrumb = buildBreadcrumb(slug);
 	const view = {
 		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
@@ -43,7 +44,7 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 		user: authed,
 		pageData: JSON.stringify({ title, slug, body: doc.body }),
 	};
-	return renderTemplate("page", view, { title: page.title, user: authed, q: "", needsPageRender: true });
+	return renderTemplate("page", view, { title: title || page.slug, user: authed, q: "", needsPageRender: true });
 }
 
 // 공통: 리다이렉트 조회. 있으면 301 리다이렉트, 없으면 null.

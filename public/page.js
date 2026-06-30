@@ -41,7 +41,9 @@
 		return defaultNormalizeLink(url);
 	};
 
-	el.innerHTML = md.render('# ' + d.title + '\n\n' + d.body);
+	// Render heading: dimmed 'untitled' placeholder if the page has no title.
+	var heading = d.title ? md.render('# ' + d.title) : '<h1><em style="color:var(--pico-muted-color,#999)">untitled</em></h1>';
+	el.innerHTML = heading + md.render(d.body);
 
 	if (window.renderMathInElement) {
 		renderMathInElement(el, {
