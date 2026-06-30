@@ -147,6 +147,9 @@ ${RENDER_SCRIPTS}
 <label>Title
 <input type="text" name="title" value="{{title}}">
 </label>
+<label>Path <small>e.g. tech/web — leave empty for root</small>
+<input type="text" name="path" value="{{path}}">
+</label>
 <label>
 <input type="checkbox" name="public" {{#if public}}checked{{/if}}> Public
 </label>

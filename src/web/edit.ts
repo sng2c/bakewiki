@@ -9,10 +9,16 @@ import { renderTemplate } from "../render/hbs.js";
 export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
 	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
+	// path 추출: 슬러그에서 마지막 세그먼트 제거.
+	function extractPath(slug: string): string {
+		const idx = slug.lastIndexOf("/");
+		return idx < 0 ? "" : slug.slice(0, idx);
+	}
+
 	// /edit 와 /edit/ → 새 문서
 	app.get("/edit", requireAuth, (c) => {
 		return c.html(renderTemplate("editor", {
-			page: null, slug: "", title: "", public: true, body: "",
+			page: null, slug: "", title: "", path: "", public: true, body: "",
 		}, { title: "New page", user: true, q: "", needsRender: true }));
 	});
 
@@ -23,13 +29,14 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const page = await getPage(store, slug);
 		if (!page) {
 			return c.html(renderTemplate("editor", {
-				page: null, slug, title: "", public: true, body: "",
+				page: null, slug, title: "", path: extractPath(slug), public: true, body: "",
 			}, { title: "New page", user: true, q: "", needsRender: true }));
 		}
 		const doc = parseDocument(page.content);
 		return c.html(renderTemplate("editor", {
 			page, slug,
 			title: page.title,
+			path: extractPath(slug),
 			public: page.isPublic,
 			body: doc.body,
 		}, { title: `Edit: ${page.title}`, user: true, q: "", needsRender: true }));
@@ -39,6 +46,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 	app.post("/edit", requireAuth, async (c) => {
 		const form = await c.req.formData();
 		const originalSlug = String(form.get("originalSlug") ?? "").trim();
+		const pagePath = String(form.get("path") ?? "").trim();
 		const isPublic = form.get("public") === "on";
 		const title = String(form.get("title") ?? "").trim();
 		const body = String(form.get("content") ?? "");
@@ -49,17 +57,18 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 			// 기존 문서 편집 — slug 변경 없이 내용/타이틀/public 업데이트
 			await updatePage(store, originalSlug, body, { isPublic, title: title || undefined });
 		} else {
-			// 새 문서 — 타이틀에서 슬러그 유도, 없으면 nanoid
+			// 새 문서 — path + 타이틀에서 슬러그 유도, 없으면 nanoid
 			let slug: string;
 			if (title) {
 				const slugified = slugifyTitle(title);
-				slug = slugified || generateSlug();
+				const segment = slugified || generateSlug();
+				slug = pagePath ? `${pagePath}/${segment}` : segment;
 			} else {
 				slug = generateSlug();
 			}
-			// 슬러그 충돌 시 nanoid로 대체
+			// 슬러그 충돌 시 접미사 추가
 			const existing = await getPage(store, slug);
-			if (existing && title) {
+			if (existing) {
 				slug = `${slug}-${generateSlug().slice(0, 4)}`;
 			}
 			const existing2 = await getPage(store, slug);
