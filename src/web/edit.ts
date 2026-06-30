@@ -3,7 +3,7 @@ import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
 import { requireAuth } from "../auth/middleware.js";
 import { getPage, createPage, updatePage, deletePage, generateSlug, slugifyTitle, migrateUploads, rewriteUploadLinks } from "../pages/store.js";
-import { parseDocument, ensureHeading } from "../pages/frontmatter.js";
+import { parseDocument } from "../pages/frontmatter.js";
 import { renderTemplate } from "../render/hbs.js";
 
 export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
@@ -41,12 +41,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const originalSlug = String(form.get("originalSlug") ?? "").trim();
 		const isPublic = form.get("public") === "on";
 		const title = String(form.get("title") ?? "").trim();
-		let body = String(form.get("content") ?? "");
-
-		// 타이틀이 있으면 본문에 # 헤딩 추가 (헤딩이 없을 때만)
-		if (title) {
-			body = ensureHeading(body, title);
-		}
+		const body = String(form.get("content") ?? "");
 
 		const store = c.get("store");
 
