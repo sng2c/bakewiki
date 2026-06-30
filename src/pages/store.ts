@@ -2,9 +2,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import type { Store } from "../env.js";
-import { pagesDir, uploadsDir } from "../data.js";
-import { slugToUploadDir, dirToSlug } from "../uploads/routes.js";
-import { parseDocument, extractTitle, extractPublic, ensureHeading, type ParsedDocument } from "./frontmatter.js";
+import { pagesDir, pageDir, indexPath, metaPath } from "../data.js";
+import { parseDocument, extractTitle, readMeta, writeMeta } from "./frontmatter.js";
 import { upsertSearchIndex, removeFromSearchIndex } from "./search.js";
 
 // ── 타입 ──
@@ -31,21 +30,33 @@ export function generateSlug(): string {
 	return id;
 }
 
-// ── slug ↔ 파일 경로 변환 ──
-function slugToPath(dataDir: string, slug: string): string {
-	return path.join(pagesDir(dataDir), `${slug}.md`);
+// ── slug에서 타이틀 추출 (마지막 세그먼트) ──
+export function slugToTitle(slug: string): string {
+	if (slug === "index") return "index";
+	const idx = slug.lastIndexOf("/");
+	return idx < 0 ? slug : slug.slice(idx + 1);
+}
+
+// 타이틀에서 슬러그 세그먼트 유도: 공백→하이픈, /→하이픈, 앞뒤 공백/하이픈 제거
+// 결과는 slug의 마지막 세그먼트(=title 파생)이며, 전체 slug가 아님에 유의.
+export function slugifyTitle(title: string): string {
+	return title
+		.replace(/\//g, "-")
+		.replace(/\s+/g, "-")
+		.replace(/#+/g, "")
+		.replace(/-+/g, "-")
+		.replace(/^-+|-+$/g, "");
 }
 
 // ── CRUD ──
 export async function getPage(store: Store, slug: string): Promise<Page | null> {
-	const filePath = slugToPath(store.dataDir, slug);
+	const contentPath = indexPath(store.dataDir, slug);
 	try {
-		const content = await fs.readFile(filePath, "utf-8");
-		const stat = await fs.stat(filePath);
+		const content = await fs.readFile(contentPath, "utf-8");
+		const meta = await readMeta(metaPath(store.dataDir, slug));
 		const doc = parseDocument(content);
-		const title = extractTitle(doc) ?? slug;
-		const isPublic = extractPublic(doc);
-		return { slug, title, content, isPublic, updatedAt: stat.mtime.toISOString() };
+		const title = extractTitle(doc) ?? slugToTitle(slug);
+		return { slug, title, content, isPublic: meta.public, updatedAt: meta.updatedAt };
 	} catch {
 		return null;
 	}
@@ -57,157 +68,109 @@ export async function listPages(store: Store, includePrivate = false): Promise<P
 	return listPagesFromIndex(includePrivate);
 }
 
-// 타이틀에서 슬러그 유도: 공백→하이픈, /→하이픈, 앞뒤 공백/하이픈 제거
-export function deriveSlugFromTitle(title: string): string {
-	return title
-		.replace(/\//g, "-")
-		.replace(/\s+/g, "-")
-		.replace(/#+/g, "")
-		.replace(/-+/g, "-")
-		.replace(/^-+|-+$/g, "");
-}
-
 export async function createPage(store: Store, slug: string, content: string): Promise<Page> {
 	const resolvedSlug = slug || generateSlug();
-	const filePath = slugToPath(store.dataDir, resolvedSlug);
-	await fs.mkdir(path.dirname(filePath), { recursive: true });
-	await fs.writeFile(filePath, content, "utf-8");
+	const dir = pageDir(store.dataDir, resolvedSlug);
+	await fs.mkdir(dir, { recursive: true });
+	await fs.writeFile(indexPath(store.dataDir, resolvedSlug), content, "utf-8");
+	const now = new Date().toISOString();
+	await writeMeta(metaPath(store.dataDir, resolvedSlug), { public: true, updatedAt: now });
 	const doc = parseDocument(content);
-	const title = extractTitle(doc) ?? resolvedSlug;
-	const isPublic = extractPublic(doc);
-	const stat = await fs.stat(filePath);
-	const updatedAt = stat.mtime.toISOString();
-	upsertSearchIndex(resolvedSlug, extractTitle(doc) ?? "", doc.body, isPublic, updatedAt);
+	const title = extractTitle(doc) ?? slugToTitle(resolvedSlug);
+	upsertSearchIndex(resolvedSlug, extractTitle(doc) ?? title, doc.body, true, now);
 
-	return { slug: resolvedSlug, title, content, isPublic, updatedAt };
+	return { slug: resolvedSlug, title, content, isPublic: true, updatedAt: now };
 }
 
-export async function updatePage(store: Store, slug: string, content: string): Promise<Page | null> {
-	const filePath = slugToPath(store.dataDir, slug);
+export async function updatePage(store: Store, slug: string, content: string, options?: { isPublic?: boolean }): Promise<Page | null> {
+	const contentPath = indexPath(store.dataDir, slug);
 	try {
-		await fs.access(filePath);
+		await fs.access(contentPath);
 	} catch {
 		return null;
 	}
-	await fs.writeFile(filePath, content, "utf-8");
+	const meta = await readMeta(metaPath(store.dataDir, slug));
+	await fs.writeFile(contentPath, content, "utf-8");
+	const now = new Date().toISOString();
+	const isPublic = options?.isPublic !== undefined ? options.isPublic : meta.public;
+	await writeMeta(metaPath(store.dataDir, slug), { public: isPublic, updatedAt: now });
 	const doc = parseDocument(content);
-	const title = extractTitle(doc) ?? slug;
-	const isPublic = extractPublic(doc);
-	const stat = await fs.stat(filePath);
-	const updatedAt = stat.mtime.toISOString();
-	upsertSearchIndex(slug, extractTitle(doc) ?? "", doc.body, isPublic, updatedAt);
-	return { slug, title, content, isPublic, updatedAt };
+	const title = extractTitle(doc) ?? slugToTitle(slug);
+	upsertSearchIndex(slug, extractTitle(doc) ?? title, doc.body, isPublic, now);
+	return { slug, title, content, isPublic, updatedAt: now };
 }
 
-// ── 이름 변경 (slug 변경 + 리다이렉트 등록) ──
+// ── 이름 변경 (디렉토리 rename) ──
 export async function renamePage(store: Store, oldSlug: string, newSlug: string): Promise<Page | null> {
-	const oldPath = slugToPath(store.dataDir, oldSlug);
-	const newPath = slugToPath(store.dataDir, newSlug);
+	const oldDir = pageDir(store.dataDir, oldSlug);
+	const newDir = pageDir(store.dataDir, newSlug);
 
-	// 원본 페이지가 없으면 실패
-	let content: string;
+	// 원본 디렉토리가 없으면 실패
 	try {
-		content = await fs.readFile(oldPath, "utf-8");
+		await fs.access(oldDir);
 	} catch {
 		return null;
 	}
 
 	// 대상 slug가 이미 존재하면 실패
 	try {
-		await fs.access(newPath);
+		await fs.access(newDir);
 		return null; // 대상 이미 존재
 	} catch {
 		// 통과 — 대상 없음
 	}
 
-	// 새 경로에 쓰고 기존 파일 삭제
-	await fs.mkdir(path.dirname(newPath), { recursive: true });
-	await fs.writeFile(newPath, content, "utf-8");
-	await fs.unlink(oldPath);
-
-	// 빈 부모 디렉토리 정리
-	const oldDir = path.dirname(oldPath);
-	const pagesRoot = pagesDir(store.dataDir);
-	if (oldDir !== pagesRoot) {
-		const entries = await fs.readdir(oldDir).catch(() => undefined);
-		if (entries !== undefined && entries.length === 0) {
-			await fs.rmdir(oldDir).catch(() => {});
-		}
-	}
+	// 디렉토리 rename (첨부파일도 함께 이동)
+	await fs.mkdir(path.dirname(newDir), { recursive: true });
+	await fs.rename(oldDir, newDir);
 
 	// 검색 인덱스 갱신
+	const content = await fs.readFile(indexPath(store.dataDir, newSlug), "utf-8");
+	const meta = await readMeta(metaPath(store.dataDir, newSlug));
 	const doc = parseDocument(content);
-	const title = extractTitle(doc) || newSlug;
-	const isPublic = extractPublic(doc);
-	const stat = await fs.stat(newPath);
-	const updatedAt = stat.mtime.toISOString();
+	const title = extractTitle(doc) ?? slugToTitle(newSlug);
 	removeFromSearchIndex(oldSlug);
-	upsertSearchIndex(newSlug, extractTitle(doc) ?? "", doc.body, isPublic, updatedAt);
+	upsertSearchIndex(newSlug, extractTitle(doc) ?? title, doc.body, meta.public, meta.updatedAt);
 
-	// 업로드 파일 동기화: oldSlug 프리픽스 파일들 rename + 본문 링크 갱신
-	const migrated = await migrateUploads(store.dataDir, oldSlug, newSlug);
-	let finalContent = content;
-	if (migrated.length > 0) {
-		finalContent = rewriteUploadLinks(content, migrated);
-		await fs.writeFile(newPath, finalContent, "utf-8");
-		upsertSearchIndex(newSlug, extractTitle(doc) ?? "", parseDocument(finalContent).body, isPublic, updatedAt);
-	}
-
-	return { slug: newSlug, title, content: finalContent, isPublic, updatedAt };
+	return { slug: newSlug, title, content, isPublic: meta.public, updatedAt: meta.updatedAt };
 }
 
-// ── 업로드 마이그레이션 (rename 시) ──
-// uploads/<oldSlug>/ 디렉토리를 uploads/<newSlug>/로 rename. 반환: [{oldUrl, newUrl}]
-// oldSlug가 빈 경우 (새 문서 저장) uploads/_/ 내 파일들을 uploads/<newSlug>/로 이동.
+// ── 업로드 마이그레이션 (임시 버킷 → 페이지 디렉토리) ──
+// oldSlug가 빈 경우: data/uploads/_/ 에서 페이지 디렉토리로 파일 이동.
+// rename 시에는 호출하지 않음 (디렉토리 rename으로 첨부가 자동 이동).
 export async function migrateUploads(
 	dataDir: string,
 	oldSlug: string,
 	newSlug: string,
 ): Promise<Array<{ oldUrl: string; newUrl: string }>> {
-	const uploadsRoot = uploadsDir(dataDir);
-	const oldDir = slugToUploadDir(oldSlug);
-	const newDir = slugToUploadDir(newSlug);
-	const oldPath = path.join(uploadsRoot, oldDir);
-	const newPath = path.join(uploadsRoot, newDir);
-
-	// oldSlug가 빈 경우: uploads/_/ 에서 파일들을 개별 이동
 	if (!oldSlug) {
+		// 임시 버킷에서 페이지 디렉토리로 이동
+		const tempDir = path.join(dataDir, "uploads", "_");
+		const destDir = pageDir(dataDir, newSlug);
 		let entries: string[];
 		try {
-			entries = await fs.readdir(oldPath);
+			entries = await fs.readdir(tempDir);
 		} catch {
 			return [];
 		}
-		await fs.mkdir(newPath, { recursive: true });
+		await fs.mkdir(destDir, { recursive: true });
 		const migrated: Array<{ oldUrl: string; newUrl: string }> = [];
 		for (const name of entries) {
+			if (name === "index.md" || name === "meta.yml") continue; // 예약 파일 제외
 			try {
-				await fs.rename(path.join(oldPath, name), path.join(newPath, name));
-				migrated.push({ oldUrl: `/uploads/${oldDir}/${name}`, newUrl: `/uploads/${newDir}/${name}` });
+				await fs.rename(path.join(tempDir, name), path.join(destDir, name));
+				migrated.push({ oldUrl: `/uploads/_/${name}`, newUrl: `/pages/${newSlug}/${name}` });
 			} catch {
 				// skip
 			}
 		}
 		return migrated;
 	}
-
-	// rename: 디렉토리 통째로 이동
-	try {
-		await fs.access(oldPath);
-	} catch {
-		return []; // 원본 디렉토리 없음
-	}
-	await fs.mkdir(path.dirname(newPath), { recursive: true });
-	try {
-		await fs.rename(oldPath, newPath);
-	} catch {
-		return []; // 대상 이미 존재 등
-	}
-	// 마이그레이션 맵핑은 미사용 (본문 링크는 @@ 마커로 동적 변환)
+	// rename 시에는 첨부가 자동 이동되므로 마이그레이션 불필요
 	return [];
 }
 
-// 본문 내 /uploads/<old> 링크를 /uploads/<new>로 일괄 치환. (레거시 호환, 현재 미사용)
+// 본문 내 업로드 링크 치환.
 export function rewriteUploadLinks(
 	content: string,
 	migrations: Array<{ oldUrl: string; newUrl: string }>,
@@ -220,40 +183,11 @@ export function rewriteUploadLinks(
 }
 
 export async function deletePage(store: Store, slug: string): Promise<void> {
-	const filePath = slugToPath(store.dataDir, slug);
+	const dir = pageDir(store.dataDir, slug);
 	try {
-		await fs.unlink(filePath);
-		// 빈 부모 디렉토리 정리
-		const dir = path.dirname(filePath);
-		const pagesRoot = pagesDir(store.dataDir);
-		if (dir !== pagesRoot) {
-			const entries = await fs.readdir(dir).catch(() => undefined);
-			if (entries !== undefined && entries.length === 0) {
-				await fs.rmdir(dir).catch(() => {});
-			}
-		}
-	} catch {
-		// 파일이 없으면 무시
-	}
-	removeFromSearchIndex(slug);
-
-	// 이 페이지에 속한 업로드 파일들 일괄 삭제
-	await deleteUploadsFor(store.dataDir, slug);
-}
-
-// slug 디렉토리의 업로드 파일들을 모두 삭제 (고아 방지).
-async function deleteUploadsFor(dataDir: string, slug: string): Promise<void> {
-	const uploadsRoot = uploadsDir(dataDir);
-	const slugDir = slugToUploadDir(slug);
-	const dir = path.join(uploadsRoot, slugDir);
-	try {
-		const entries = await fs.readdir(dir);
-		for (const name of entries) {
-			await fs.unlink(path.join(dir, name)).catch(() => {});
-		}
-		// 빈 디렉토리 삭제
-		await fs.rmdir(dir).catch(() => {});
+		await fs.rm(dir, { recursive: true });
 	} catch {
 		// 디렉토리가 없으면 무시
 	}
+	removeFromSearchIndex(slug);
 }

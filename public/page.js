@@ -52,25 +52,27 @@
 		return true;
 	});
 
-	// Link resolution: standard URL — relative links resolve against parent directory.
-	// Slug = "tech/web/http" → base = "tech/web" (parent directory).
+	// Link resolution: standard URL — relative links resolve against parent path.
+	// Slug = "tech/web/http" → path = "tech/web" (parent path).
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
 		// @@<file> marker → upload reference, resolve with current slug
 		if (url.startsWith('@@') && d.slug) {
 			var ufile = url.slice(2);
-			return defaultNormalizeLink('/uploads/' + slugToUploadDir(d.slug) + '/' + ufile);
+			return defaultNormalizeLink('/pages/' + slugToUploadDir(d.slug) + '/' + ufile);
 		}
-		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url);
+		if (url.startsWith('/pages/')) return defaultNormalizeLink(url);
+		// Legacy /uploads/ URLs redirect to /pages/
+		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url.replace('/uploads/', '/pages/'));
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
-		// Relative URL: resolve against parent directory of current slug
+		// Relative URL: resolve against parent path of current slug
 		var base = d.slug;
 		if (base) {
 			var slashIdx = base.lastIndexOf('/');
-			var dir = slashIdx >= 0 ? base.substring(0, slashIdx) : '';
-			var parts = (dir ? dir.split('/') : []).concat(url.split('/'));
+			var pagePath = slashIdx >= 0 ? base.substring(0, slashIdx) : '';
+			var parts = (pagePath ? pagePath.split('/') : []).concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }

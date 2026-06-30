@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { pagesDir } from "../data.js";
-import { parseDocument, extractTitle, extractPublic } from "./frontmatter.js";
+import { parseDocument, extractTitle, readMeta } from "./frontmatter.js";
 
 // ── 인메모리 검색 인덱스 ──
 // 서버 시작 시 빌드, 페이지 CRUD 시 갱신.
@@ -25,28 +25,58 @@ const index = new Map<string, IndexEntry>();
 export async function buildSearchIndex(dataDir: string): Promise<void> {
 	index.clear();
 	const root = pagesDir(dataDir);
+	// 루트(pages/) 자체도 index 페이지일 수 있음 (slug = "index")
+	await indexPageDir(root, root, "");
 	await walkAndIndex(root, root);
 }
 
-async function walkAndIndex(root: string, dir: string): Promise<void> {
-	const entries = await fs.readdir(dir, { withFileTypes: true });
-	for (const entry of entries) {
-		const full = path.join(dir, entry.name);
-		if (entry.isDirectory()) {
-			await walkAndIndex(root, full);
-		} else if (entry.isFile() && /\.md$/i.test(entry.name)) {
-			const slug = path.relative(root, full).replace(/\.md$/i, "").replace(/\\/g, "/");
-			try {
-				const content = await fs.readFile(full, "utf-8");
-				const stat = await fs.stat(full);
-				const doc = parseDocument(content);
-				const title = extractTitle(doc) ?? "";
-				const isPublic = extractPublic(doc);
-				index.set(slug, { title, content: doc.body, isPublic, updatedAt: stat.mtime.toISOString() });
-			} catch {
-				// 읽기 실패 시 스킵
-			}
+// 루트 디렉토리(pages/)를 index 페이지로 인식.
+async function indexPageDir(root: string, dir: string, parentSlug: string): Promise<void> {
+	const idxPath = path.join(dir, "index.md");
+	try {
+		const stat = await fs.stat(idxPath);
+		if (stat.isFile()) {
+			const slug = parentSlug || "index";
+			const content = await fs.readFile(idxPath, "utf-8");
+			const meta = await readMeta(path.join(dir, "meta.yml"));
+			const doc = parseDocument(content);
+			const title = extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
+			index.set(slug, { title, content: doc.body, isPublic: meta.public, updatedAt: meta.updatedAt });
 		}
+	} catch {
+		// index.md 없음 — 페이지 아님
+	}
+}
+
+// 디렉토리 순회: 하위 디렉토리의 index.md가 있으면 페이지로 인식.
+async function walkAndIndex(root: string, dir: string): Promise<void> {
+	let entries: import("node:fs").Dirent[];
+	try {
+		entries = await fs.readdir(dir, { withFileTypes: true });
+	} catch {
+		return;
+	}
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		const full = path.join(dir, entry.name);
+		// 이 하위 디렉토리를 페이지로 인식 시도
+		const subSlug = path.relative(root, full).replace(/\\/g, "/");
+		const idxPath = path.join(full, "index.md");
+		try {
+			const stat = await fs.stat(idxPath);
+			if (stat.isFile()) {
+				const slug = subSlug || "index";
+				const content = await fs.readFile(idxPath, "utf-8");
+				const meta = await readMeta(path.join(full, "meta.yml"));
+				const doc = parseDocument(content);
+				const title = extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
+				index.set(slug, { title, content: doc.body, isPublic: meta.public, updatedAt: meta.updatedAt });
+			}
+		} catch {
+			// index.md 없음 — 페이지 아님
+		}
+		// 하위 디렉토리도 순회
+		await walkAndIndex(root, full);
 	}
 }
 

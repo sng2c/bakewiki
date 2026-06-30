@@ -13,11 +13,10 @@ type FlatItem = {
 	title?: string;
 	isPublic?: boolean;
 	depth: number;
-	dirPath?: string; // 디렉토리 전체 경로 (클릭용)
+	dirPath?: string;
 };
 
-// 페이지 목록을 디렉토리 트리로 그룹화하여 평탄화.
-// 디렉토리 노드와 페이지 노드가 depth 정보와 함께 반환됨.
+// 페이지 목록을 path 트리로 그룹화하여 평탄화.
 function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>): FlatItem[] {
 	type TreeNode = {
 		name: string;
@@ -30,7 +29,6 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 
 	const root: TreeNode = { name: "", isPage: false, children: new Map() };
 
-	// 페이지를 트리에 삽입
 	for (const page of pages) {
 		const segments = page.slug.split("/");
 		let node = root;
@@ -55,14 +53,12 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 		}
 	}
 
-	// 트리를 평탄화 (디렉토리 먼저, 그 다음 페이지)
 	const items: FlatItem[] = [];
 	function flatten(n: TreeNode, depth: number, prefix: string) {
 		const dirs: TreeNode[] = [];
 		const pages: TreeNode[] = [];
 		for (const child of n.children.values()) {
 			if (child.isPage && child.children.size > 0) {
-				// 페이지이면서 자식이 있는 경우: 디렉토리로도 표시
 				dirs.push(child);
 			} else if (child.children.size > 0) {
 				dirs.push(child);
@@ -70,14 +66,11 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 				pages.push(child);
 			}
 		}
-		// 디렉토리를 이름순으로 정렬
 		dirs.sort((a, b) => a.name.localeCompare(b.name));
 		pages.sort((a, b) => a.name.localeCompare(b.name));
-		// 디렉토리 먼저 출력
 		for (const d of dirs) {
 			const dirPath = prefix ? prefix + "/" + d.name : d.name;
 			if (d.isPage) {
-				// 페이지이면서 디렉토리인 경우: 페이지로 표시 + 자식은 하위에
 				items.push({ isDir: false, name: d.name, slug: d.slug, title: d.title, isPublic: d.isPublic, depth });
 				flatten(d, depth + 1, dirPath);
 			} else {
@@ -85,7 +78,6 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 				flatten(d, depth + 1, dirPath);
 			}
 		}
-		// 그 다음 일반 페이지
 		for (const p of pages) {
 			items.push({ isDir: false, name: p.name, slug: p.slug, title: p.title, isPublic: p.isPublic, depth });
 		}
@@ -95,9 +87,6 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 }
 
 // 슬러그에서 breadcrumb 항목 생성.
-// 마지막 세그먼트는 title로 표시, 나머지는 slug 세그먼트.
-// tech/web/HTTP + title="HTTP" → [🏠, tech, web, HTTP(current)]
-// index 세그먼트는 🏠 아이콘으로 표시.
 function buildBreadcrumb(slug: string, title: string) {
 	const segments = slug.split("/");
 	const items: Array<{ name: string; href?: string; current?: boolean }> = [];
@@ -121,8 +110,7 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 	if (!page) return null;
 	if (!page.isPublic && !authed) return null;
 	const doc = parseDocument(page.content);
-	const extractedTitle = extractTitle(doc) ?? "";
-	const title = extractedTitle;
+	const title = page.title;
 	const breadcrumb = buildBreadcrumb(slug, title);
 	const view = {
 		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
@@ -148,7 +136,7 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		return c.html(renderTemplate("notFound", { slug: "index", canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
 	});
 
-	// 전체 목록 (/pages) — 디렉토리별 그룹 트리
+	// 전체 목록 (/pages)
 	app.get("/pages", async (c) => {
 		const user = c.get("user");
 		const store = c.get("store");
@@ -167,7 +155,7 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		return c.html(html);
 	});
 
-	// 문서 조회 (/pages/:slug{.+}). 리다이렉트 → 301, 없으면 notFound.
+	// 문서 조회 (/pages/:slug{.+})
 	app.get("/pages/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug")!;
 		const user = c.get("user");

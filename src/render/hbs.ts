@@ -144,9 +144,6 @@ ${RENDER_SCRIPTS}
 	editor: `<h1>{{#if page}}Edit: {{page.title}}{{else}}New page{{/if}}</h1>
 <form action="/edit" method="post">
 <input type="hidden" name="originalSlug" value="{{#if page}}{{page.slug}}{{/if}}">
-<label>Directory <small>e.g. tech/web — leave empty for root</small>
-<input type="text" name="directory" value="{{directory}}">
-</label>
 <label>
 <input type="checkbox" name="public" {{#if public}}checked{{/if}}> Public
 </label>

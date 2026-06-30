@@ -28,15 +28,15 @@ export class BakewikiClient {
 	async listPages(): Promise<{ slug: string; title: string; public: boolean; updatedAt: string }[]> {
 		const { ok, data } = await this.request("GET", "/api/pages");
 		if (!ok) throw new Error(`Failed to list pages: ${JSON.stringify(data)}`);
-		const pages = (data as { pages: { slug: string; title: string; isPublic: boolean; updatedAt: string }[] }).pages;
-		return pages.map((p) => ({ slug: p.slug, title: p.title, public: p.isPublic, updatedAt: p.updatedAt }));
+		const pages = (data as { pages: { slug: string; title: string; public: boolean; updatedAt: string }[] }).pages;
+		return pages;
 	}
 
 	async getPage(slug: string): Promise<{ slug: string; title: string; public: boolean; updatedAt: string; content: string }> {
 		const { ok, status, data } = await this.request("GET", `/api/pages/${slug}`);
 		if (!ok) throw new Error(`Page not found: ${slug}`);
-		const page = (data as { page: { slug: string; title: string; isPublic: boolean; updatedAt: string; content: string } }).page;
-		return { slug: page.slug, title: page.title, public: page.isPublic, updatedAt: page.updatedAt, content: page.content };
+		const page = (data as { page: { slug: string; title: string; public: boolean; updatedAt: string; content: string } }).page;
+		return page;
 	}
 
 	async createPage(slug: string, content: string): Promise<{ slug: string; title: string }> {
@@ -68,10 +68,10 @@ export class BakewikiClient {
 		return (data as { results: { slug: string; title: string; snippet: string }[] }).results;
 	}
 
-	async sitemap(): Promise<{ slug: string; children?: Record<string, unknown> }[]> {
+	async sitemap(): Promise<{ name: string; path: string; slug?: string; children?: Record<string, unknown> }[]> {
 		const { ok, data } = await this.request("GET", "/api/sitemap");
 		if (!ok) throw new Error(`Failed to get sitemap: ${JSON.stringify(data)}`);
-		return (data as { tree: { slug: string; children?: Record<string, unknown> }[] }).tree;
+		return (data as { tree: { name: string; path: string; slug?: string; children?: Record<string, unknown> }[] }).tree;
 	}
 
 	async health(): Promise<boolean> {
@@ -184,7 +184,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 				console.log("No pages.");
 				return;
 			}
-			// 트리 구조로 출력 (디렉토리별 그룹)
+			// 트리 구조로 출력 (path별 그룹)
 			printPageTree(pages);
 			break;
 		}
@@ -199,7 +199,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 			const client = new BakewikiClient(opts.url, opts.key);
 			for (let i = 0; i < slugs.length; i++) {
 				const page = await client.getPage(slugs[i]);
-				const body = stripFrontmatter(page.content);
+				const body = page.content;
 				if (i > 0) console.log("----");
 				console.log(`slug:    ${page.slug}`);
 				console.log(`title:   ${page.title}`);
@@ -303,7 +303,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 			}
 			for (let i = 0; i < results.length; i++) {
 				const r = results[i];
-				const snippet = stripFrontmatter(r.snippet).replace(/<[^>]+>/g, "").trim();
+				const snippet = r.snippet.replace(/<[^>]+>/g, "").trim();
 				if (i > 0) console.log("----");
 				console.log(`slug:    ${r.slug}`);
 				console.log(`title:   ${r.title}`);
@@ -317,13 +317,14 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 		case "sitemap": {
 			const client7 = new BakewikiClient(opts.url, opts.key);
 			const tree = await client7.sitemap();
-			function printSitemap(nodes: { slug: string; title?: string; isPublic?: boolean; children?: Record<string, unknown> }[], depth = 0) {
+			function printSitemap(nodes: { name: string; path: string; slug?: string; title?: string; public?: boolean; children?: Record<string, unknown> }[], depth = 0) {
 				for (const node of nodes) {
-					const title = node.title || node.slug.split("/").pop() || node.slug;
-					const vis = node.isPublic === false ? " 🔒" : "";
-					console.log(`${"  ".repeat(depth)}${title}${vis}  (${node.slug})`);
+					const label = node.title || node.name;
+					const vis = node.public === false ? " 🔒" : "";
+					const id = node.slug ? `slug: ${node.slug}` : `path: ${node.path}/${node.name}`;
+					console.log(`${"  ".repeat(depth)}${label}${vis}  (${id})`);
 					if (node.children) {
-						const childNodes = Object.values(node.children) as { slug: string; title?: string; isPublic?: boolean; children?: Record<string, unknown> }[];
+						const childNodes = Object.values(node.children) as { name: string; path: string; slug?: string; title?: string; public?: boolean; children?: Record<string, unknown> }[];
 						printSitemap(childNodes, depth + 1);
 					}
 				}
@@ -435,8 +436,8 @@ async function fileCommand(sub: string | undefined, args: string[], opts: Remote
 				process.exit(1);
 			}
 			const client = new BakewikiClient(opts.url, opts.key);
-			// /uploads/로 시작하지 않으면 파일명으로 간주
-			const fileUrl = dlInput.startsWith("/uploads/") ? dlInput : `/uploads/${dlInput}`;
+			// /pages/로 시작하지 않으면 파일명으로 간주
+			const fileUrl = dlInput.startsWith("/pages/") ? dlInput : `/pages/${dlInput}`;
 			const data = await client.downloadFile(fileUrl);
 			if (!output || output === "-") {
 				process.stdout.write(data);
@@ -457,19 +458,15 @@ async function fileCommand(sub: string | undefined, args: string[], opts: Remote
 	}
 }
 
-// frontmatter 제거하고 본문만 반환.
-function stripFrontmatter(content: string): string {
-	const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
-	return match ? match[1] : content;
-}
 
-// 페이지 목록을 디렉토리 트리로 출력.
+
+// 페이지 목록을 path 트리로 출력.
 function printPageTree(pages: Array<{ slug: string; title: string; public: boolean; updatedAt: string }>): void {
 	type TreeNode = {
 		name: string;
 		slug?: string;
 		title?: string;
-		isPublic?: boolean;
+		public?: boolean;
 		isPage: boolean;
 		children: Map<string, TreeNode>;
 	};
@@ -489,7 +486,7 @@ function printPageTree(pages: Array<{ slug: string; title: string; public: boole
 				child.isPage = true;
 				child.slug = page.slug;
 				child.title = page.title;
-				child.isPublic = page.public;
+				child.public = page.public;
 			}
 			node = child;
 		}
@@ -509,7 +506,7 @@ function printPageTree(pages: Array<{ slug: string; title: string; public: boole
 			const dirPath = prefix ? prefix + "/" + d.name : d.name;
 			const indent = "  ".repeat(depth);
 			if (d.isPage) {
-				const vis = d.isPublic === false ? " 🔒" : "";
+				const vis = d.public === false ? " 🔒" : "";
 				console.log(`${indent}${d.title || d.name}${vis}  (${d.slug})`);
 			} else {
 				console.log(`${indent}${d.name}  (${dirPath})`);
@@ -518,7 +515,7 @@ function printPageTree(pages: Array<{ slug: string; title: string; public: boole
 		}
 		for (const p of leafPages) {
 			const indent = "  ".repeat(depth);
-			const vis = p.isPublic === false ? " 🔒" : "";
+			const vis = p.public === false ? " 🔒" : "";
 			console.log(`${indent}${p.title || p.name}${vis}  (${p.slug})`);
 		}
 	}

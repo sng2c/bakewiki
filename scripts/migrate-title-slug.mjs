@@ -27,8 +27,8 @@ console.log("---");
 const pagesDir = path.join(dataDir, "pages");
 const uploadsDir = path.join(dataDir, "uploads");
 
-// 타이틀에서 슬러그 유도 (store.ts의 deriveSlugFromTitle와 동일)
-function deriveSlugFromTitle(title) {
+// 타이틀을 슬러그 세그먼트로 변환 (store.ts의 slugifyTitle와 동일)
+function slugifyTitle(title) {
 	return title
 		.replace(/\//g, "-")
 		.replace(/\s+/g, "-")
@@ -125,11 +125,11 @@ async function migrate() {
 			// index 페이지는 특수 케이스: 슬러그 유지
 			newSlug = "index";
 		} else {
-			// 디렉토리 + 유도된 타이틀
+			// path + 변환된 타이틀
 			const dir = path.posix.dirname(slug);
 			const dirPart = dir === "." ? "" : dir;
-			const titlePart = deriveSlugFromTitle(title);
-			newSlug = dirPart ? `${dirPart}/${titlePart}` : titlePart;
+			const slugifiedTitle = slugifyTitle(title);
+			newSlug = dirPart ? `${dirPart}/${slugifiedTitle}` : slugifiedTitle;
 		}
 
 		// 슬러그가 변경되지 않고 내용도 동일하면 건너뛰기

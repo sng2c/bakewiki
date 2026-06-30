@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 // ── 데이터 디렉토리 해석 ──
 // 반드시 CLI --data 플래그 또는 BAKEWIKI_DATA_DIR 환경변수로 지정되어야 함.
@@ -20,9 +20,6 @@ export function pagesDir(dataDir: string): string {
 	return path.join(dataDir, "pages");
 }
 
-export function uploadsDir(dataDir: string): string {
-	return path.join(dataDir, "uploads");
-}
 
 // 정적 자산(JS) 디렉토리 해석. tsx(src) 실행과 dist(컴파일) 실행 모두 지원.
 // import.meta.url 위치에서 위로 올라가 public/ 폴더를 찾는다.
@@ -46,9 +43,33 @@ export function configPath(dataDir: string): string {
 	return path.join(dataDir, "config.yml");
 }
 
+export function pageDir(dataDir: string, slug: string): string {
+	if (slug === "index") return pagesDir(dataDir);
+	return path.join(pagesDir(dataDir), slug);
+}
+
+export function indexPath(dataDir: string, slug: string): string {
+	return path.join(pageDir(dataDir, slug), "index.md");
+}
+
+export function metaPath(dataDir: string, slug: string): string {
+	return path.join(pageDir(dataDir, slug), "meta.yml");
+}
+
 export async function initDataDir(dataDir: string): Promise<void> {
 	await fs.mkdir(pagesDir(dataDir), { recursive: true });
-	await fs.mkdir(uploadsDir(dataDir), { recursive: true });
+
+	// 홈페이지 기본 파일 생성
+	const homeIndexPath = path.join(pagesDir(dataDir), "index.md");
+	const homeMetaPath = path.join(pagesDir(dataDir), "meta.yml");
+	try { await fs.access(homeIndexPath); } catch {
+		await fs.writeFile(homeIndexPath, "# Welcome to BakeWiki\n", "utf-8");
+	}
+	try { await fs.access(homeMetaPath); } catch {
+		const now = new Date().toISOString();
+		const content = stringifyYaml({ public: true, updatedAt: now }).trimEnd() + "\n";
+		await fs.writeFile(homeMetaPath, content, "utf-8");
+	}
 }
 
 // ── 설정 (config.yml) ──

@@ -16,7 +16,7 @@
 		}
 	});
 
-	var directoryInput = document.querySelector('input[name=directory]');
+	var pathInput = document.querySelector('input[name=path]');
 	var originalSlug = document.querySelector('input[name=originalSlug]');
 	var ta = document.getElementById('editor-content');
 	var pv = document.getElementById('editor-preview');
@@ -25,20 +25,20 @@
 
 	if (!ta || !pv) return;
 
-	// Compute slug from directory + first # heading in content
+	// Compute slug from path + first # heading in content
 	function computeSlug() {
-		var dir = directoryInput ? directoryInput.value.trim() : '';
+		var pagePath = pathInput ? pathInput.value.trim() : '';
 		var body = ta.value;
 		var match = body.match(/^#\s+(.+)$/m);
 		var title = match ? match[1].trim() : '';
-		var slugPart = title
+		var slugifiedTitle = title
 			.replace(/\//g, '-')
 			.replace(/\s+/g, '-')
 			.replace(/#+/g, '')
 			.replace(/-+/g, '-')
 			.replace(/^-+|-+$/g, '');
-		if (!slugPart) return '';
-		return dir ? dir + '/' + slugPart : slugPart;
+		if (!slugifiedTitle) return '';
+		return pagePath ? pagePath + '/' + slugifiedTitle : slugifiedTitle;
 	}
 
 	// Current page slug: use originalSlug for existing pages, computeSlug for new pages.
@@ -78,24 +78,26 @@
 		return true;
 	});
 
-	// Link resolution: standard URL — relative links resolve against parent directory.
+	// Link resolution: standard URL — relative links resolve against parent path.
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
 		// @@<file> marker → upload reference, resolve with current slug
 		if (url.startsWith('@@')) {
 			var ufile = url.slice(2);
-			return defaultNormalizeLink('/uploads/' + slugToUploadDir(currentSlug()) + '/' + ufile);
+			return defaultNormalizeLink('/pages/' + slugToUploadDir(currentSlug()) + '/' + ufile);
 		}
-		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url);
+		if (url.startsWith('/pages/')) return defaultNormalizeLink(url);
+		// Legacy /uploads/ URLs
+		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url.replace('/uploads/', '/pages/'));
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
-		// Relative URL: resolve against parent directory of current slug
+		// Relative URL: resolve against parent path of current slug
 		var slug = currentSlug();
 		if (slug) {
 			var slashIdx = slug.lastIndexOf('/');
-			var dir = slashIdx >= 0 ? slug.substring(0, slashIdx) : '';
-			var parts = (dir ? dir.split('/') : []).concat(url.split('/'));
+			var pagePath = slashIdx >= 0 ? slug.substring(0, slashIdx) : '';
+			var parts = (pagePath ? pagePath.split('/') : []).concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }
@@ -122,7 +124,7 @@
 	function debounce() { clearTimeout(timer); timer = setTimeout(update, 400); }
 
 	ta.addEventListener('input', debounce);
-	if (directoryInput) directoryInput.addEventListener('input', debounce);
+	if (pathInput) pathInput.addEventListener('input', debounce);
 	update();
 
 	// ── Insert text at cursor ──
