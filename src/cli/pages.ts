@@ -82,13 +82,13 @@ export class BakewikiClient {
 
 	// ── File (image) API ──
 
-	async listFiles(): Promise<{ url: string; filename: string; ext: string; size: number }[]> {
+	async listFiles(): Promise<{ url: string; filename: string; original: string; ext: string; size: number }[]> {
 		const { ok, data } = await this.request("GET", "/api/upload");
 		if (!ok) throw new Error(`Failed to list files: ${JSON.stringify(data)}`);
-		return (data as { files: { url: string; filename: string; ext: string; size: number }[] }).files;
+		return (data as { files: { url: string; filename: string; original: string; ext: string; size: number }[] }).files;
 	}
 
-	async uploadFile(filename: string, data: Buffer, slug: string): Promise<{ url: string; filename: string; ext: string; size: number }> {
+	async uploadFile(filename: string, data: Buffer, slug: string): Promise<{ url: string; filename: string; original: string; ext: string; size: number }> {
 		const form = new FormData();
 		form.append("file", new Blob([data as unknown as never]), filename);
 		form.append("slug", slug);
@@ -99,7 +99,7 @@ export class BakewikiClient {
 		});
 		const json = await res.json().catch(() => null);
 		if (!res.ok) throw new Error(`Failed to upload file: ${JSON.stringify(json)}`);
-		return json as { url: string; filename: string; ext: string; size: number };
+		return json as { url: string; filename: string; original: string; ext: string; size: number };
 	}
 
 	async deleteFile(filename: string): Promise<void> {
@@ -303,11 +303,11 @@ async function fileCommand(sub: string | undefined, args: string[], opts: Remote
 				console.log("No files.");
 				return;
 			}
-			const maxName = Math.max(4, ...files.map((f) => f.filename.length));
-			console.log(`${"FILENAME".padEnd(maxName)}  SIZE       URL`);
+			const maxName = Math.max(4, ...files.map((f) => f.original.length));
+			console.log(`${"NAME".padEnd(maxName)}  SIZE       URL`);
 			for (const f of files) {
 				const size = formatSize(f.size);
-				console.log(`${f.filename.padEnd(maxName)}  ${size.padStart(9)}  ${f.url}`);
+				console.log(`${f.original.padEnd(maxName)}  ${size.padStart(9)}  ${f.url}`);
 			}
 			break;
 		}

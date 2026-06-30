@@ -122,8 +122,8 @@
 		preview.title = 'Click to insert';
 
 		var name = document.createElement('small');
-		name.textContent = item.filename;
-		name.style.cssText = 'flex:1;word-break:break-all';
+		name.textContent = item.original;
+		name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
 
 		var insertBtn = document.createElement('button');
 		insertBtn.type = 'button';
@@ -137,13 +137,13 @@
 		delBtn.className = 'secondary';
 		delBtn.style.cssText = 'font-size:0.8rem;padding:0.2rem 0.6rem;margin:0;color:#c0392b';
 		delBtn.addEventListener('click', async function () {
-			if (!confirm('Delete this file? ' + item.filename)) return;
+			if (!confirm('Delete this file? ' + item.original)) return;
 			var ok = await deleteImage(item.filename);
 			if (ok) row.remove();
 		});
 
 		function doInsert() {
-			var md = isImage ? '\n![](' + item.url + ')\n' : '\n[' + item.filename + '](' + item.url + ')\n';
+			var md = isImage ? '\n![](' + item.url + ')\n' : '\n[' + item.original + '](' + item.url + ')\n';
 			insertAtCursor(md);
 		}
 		preview.addEventListener('click', doInsert);

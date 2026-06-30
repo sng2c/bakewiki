@@ -33,6 +33,12 @@ export function decodeSlugPrefix(filename: string): string {
 	return prefix.replace(/__/g, "/");
 }
 
+// Extract the original filename (after the separator) from a stored filename.
+export function extractOriginal(filename: string): string {
+	const idx = filename.indexOf(SEPARATOR);
+	return idx >= 0 ? filename.slice(idx + SEPARATOR.length) : filename;
+}
+
 // Validate a stored filename: must contain the separator and forbid path traversal.
 // Original part may contain most chars but not "/" or "\" or ".." segments.
 function isValidStoredName(name: string | undefined): name is string {
@@ -135,7 +141,7 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 async function listUploadsFor(
 	dataDir: string,
 	slug: string | undefined,
-): Promise<Array<{ url: string; filename: string; ext: string; slug: string; size: number }>> {
+): Promise<Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }>> {
 	const dir = uploadsDir(dataDir);
 	let entries: string[];
 	try {
@@ -144,7 +150,7 @@ async function listUploadsFor(
 		return [];
 	}
 	const targetPrefix = slug !== undefined ? encodeSlugPrefix(slug) : null;
-	const files: Array<{ url: string; filename: string; ext: string; slug: string; size: number }> = [];
+	const files: Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }> = [];
 	for (const name of entries) {
 		if (!isValidStoredName(name)) continue;
 		const decodedSlug = decodeSlugPrefix(name);
@@ -157,6 +163,7 @@ async function listUploadsFor(
 			files.push({
 				url: `/uploads/${name}`,
 				filename: name,
+				original: extractOriginal(name),
 				ext: extractExt(name),
 				slug: decodedSlug,
 				size: stat.size,

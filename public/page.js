@@ -70,6 +70,7 @@ function renderAttachments(slug) {
 			var IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
 			var h2 = document.createElement('h2');
 			h2.textContent = 'Attachments';
+			h2.style.cssText = 'font-size:1em;color:var(--pico-muted-color,#999);margin-bottom:0.5rem';
 			container.appendChild(h2);
 			var list = document.createElement('ul');
 			for (var i = 0; i < data.files.length; i++) {
@@ -77,16 +78,29 @@ function renderAttachments(slug) {
 				var li = document.createElement('li');
 				var isImage = f.ext && IMAGE_EXT.indexOf(f.ext) !== -1;
 				if (isImage) {
-					var img = document.createElement('img');
-					img.src = f.url;
-					img.alt = f.filename;
-					img.style.maxWidth = '100%';
-					li.appendChild(img);
-				} else {
 					var a = document.createElement('a');
 					a.href = f.url;
-					a.textContent = f.filename;
+					a.target = '_blank';
+					a.rel = 'noopener';
+					a.style.cssText = 'display:flex;align-items:center;gap:0.5rem';
+					var img = document.createElement('img');
+					img.src = f.url;
+					img.alt = f.original;
+					img.style.cssText = 'width:2em;height:2em;object-fit:cover;border-radius:4px;flex:0 0 auto';
+					a.appendChild(img);
+					var name = document.createElement('span');
+					name.textContent = f.original;
+					name.style.cssText = 'flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+					a.appendChild(name);
 					li.appendChild(a);
+				} else {
+					var link = document.createElement('a');
+					link.href = f.url;
+					link.target = '_blank';
+					link.rel = 'noopener';
+					link.textContent = f.original;
+					link.style.cssText = 'display:inline-block;max-width:70ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+					li.appendChild(link);
 				}
 				list.appendChild(li);
 			}
