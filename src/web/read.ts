@@ -116,8 +116,8 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 		const title = segs[segs.length - 1];
 		const breadcrumb = buildBreadcrumb(slug, title);
 		const body = authed
-			? `# ${title}\n\n---\n\n> This page doesn\u2019t have any content yet.\n\n[Write this page \u2192](/edit/${slug})`
-			: `# ${title}\n\n---\n\n> This page doesn\u2019t have any content yet.\n\n[Log in](/login) to write this page.`;
+			? `# ${title}\n\n> This page doesn\u2019t have any content yet.\n\n[Write this page \u2192](/edit/${slug})`
+			: `# ${title}\n\n> This page doesn\u2019t have any content yet.\n\n[Log in](/login) to write this page.`;
 		return renderTemplate("page", {
 			page: { isPublic: true, updatedAt: "—" },
 			breadcrumb, body, title, slug, user: authed,
