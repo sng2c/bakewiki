@@ -87,6 +87,8 @@ if (import.meta.hot) {
 
 	// Render body directly — title comes from first # heading in body.
 	el.innerHTML = md.render(d.body);
+	// SSR white-space:pre-wrap was for raw markdown; remove after rendering.
+	el.style.whiteSpace = '';
 
 	if (window.renderMathInElement) {
 		renderMathInElement(el, {
