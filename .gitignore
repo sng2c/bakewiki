@@ -40,3 +40,4 @@ scripts/check-breadcrumb.ts
 playwright-report/
 test-results/
 screenshots/
+public/
