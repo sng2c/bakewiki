@@ -42,7 +42,7 @@ function bakewikiBackend(): Plugin {
 						}
 						loadBackend()
 							.then(() => {
-								console.log(`  [bakewiki] backend reloaded ✓");
+								console.log(`  [bakewiki] backend reloaded ✓`);
 								// 브라우저에 풀페이지 리로드 신호 전송
 								server.ws.send({ type: "full-reload" });
 							})

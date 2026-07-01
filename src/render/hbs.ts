@@ -15,6 +15,9 @@ const CDN = {
 Handlebars.registerHelper("eq", (a, b) => a === b);
 Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 
+// 재귀 트리 노드 partial — 페이지/폴더 목록을 중첩 ul로 렌더링.
+Handlebars.registerPartial("treeNode", `{{#each children}}<li class="{{#if isDir}}tree-dir{{else}}tree-page{{/if}}">{{#if isDir}}<span class="tree-folder"><a href="/pages/{{dirPath}}">📁 {{name}}/</a></span>{{#if children.length}}<ul>{{> treeNode children=children}}{{/if}}{{else}}<a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em>untitled</em>{{/if}}</a> <small class="tree-meta">{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{/if}}</li>{{/each}}`);
+
 // Template compile cache (name → compiled function)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
 
@@ -62,6 +65,11 @@ article > :last-child { margin-bottom: 0; }
 .edit-fab [data-lucide], .edit-fab svg { width:1.1rem; height:1.1rem; }
 .fab-label { font-size:0.75rem; font-weight:600; }
 .fab-group { position:fixed; bottom:1rem; right:1rem; z-index:50; display:flex; flex-direction:column; gap:0.6rem; }
+ul.page-tree, .page-tree ul { list-style:none; padding-left:1.2rem; margin:0; }
+ul.page-tree { padding-left:0; }
+.page-tree li { margin:0.15rem 0; }
+.page-tree .tree-folder a { font-weight:500; }
+.page-tree .tree-meta { color:var(--pico-muted-color,#999); }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
@@ -121,9 +129,9 @@ ${RENDER_SCRIPTS}
 
 
 	list: `<h1>All pages</h1>
-<ul style="list-style:none;padding:0 1rem">
+<ul class="page-tree">
 {{#each items}}
-<li style="margin-left:calc({{depth}} * 1.5rem)">{{#if isDir}}<a href="/pages/{{dirPath}}">{{name}}</a>{{else}}<a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em style="color:var(--pico-muted-color,#999)">untitled</em>{{/if}}</a> <small style="color:var(--pico-muted-color,#999)">{{slug}}{{#unless isPublic}} 🔒{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span></small>{{/if}}</li>
+<li class="tree-page"><a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em>untitled</em>{{/if}}</a> <small class="tree-meta">{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
 {{/each}}
 </ul>`,
 

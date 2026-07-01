@@ -6,28 +6,30 @@ import { searchPages } from "../pages/search.js";
 import { parseDocument, extractTitle } from "../pages/frontmatter.js";
 import { renderTemplate } from "../render/hbs.js";
 
-type FlatItem = {
-	isDir: boolean;
+type TreeNode = {
 	name: string;
 	slug?: string;
 	title?: string;
 	isPublic?: boolean;
-	depth: number;
+	isPage: boolean;
+	isDir: boolean;
 	dirPath?: string;
+	children: TreeNode[];
 };
 
-// 페이지 목록을 path 트리로 그룹화하여 평탄화.
-function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>): FlatItem[] {
-	type TreeNode = {
+type FlatItem = TreeNode;
+
+function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>): TreeNode[] {
+	type RawNode = {
 		name: string;
 		slug?: string;
 		title?: string;
 		isPublic?: boolean;
 		isPage: boolean;
-		children: Map<string, TreeNode>;
+		children: Map<string, RawNode>;
 	};
 
-	const root: TreeNode = { name: "", isPage: false, children: new Map() };
+	const root: RawNode = { name: "", isPage: false, children: new Map() };
 
 	for (const page of pages) {
 		const segments = page.slug.split("/");
@@ -53,37 +55,34 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 		}
 	}
 
-	const items: FlatItem[] = [];
-	function flatten(n: TreeNode, depth: number, prefix: string) {
-		const dirs: TreeNode[] = [];
-		const pages: TreeNode[] = [];
+	// RawNode(재귀 Map)를 정렬된 트리 배열(TreeNode)로 변환.
+	// 디렉토리(자식 있음) 먼저, 그 다음 페이지(자식 없음).
+	function toTree(n: RawNode, dirPath: string): TreeNode {
+		const dirs: RawNode[] = [];
+		const leaves: RawNode[] = [];
 		for (const child of n.children.values()) {
-			if (child.isPage && child.children.size > 0) {
-				dirs.push(child);
-			} else if (child.children.size > 0) {
-				dirs.push(child);
-			} else {
-				pages.push(child);
-			}
+			if (child.children.size > 0) dirs.push(child);
+			else leaves.push(child);
 		}
 		dirs.sort((a, b) => a.name.localeCompare(b.name));
-		pages.sort((a, b) => a.name.localeCompare(b.name));
-		for (const d of dirs) {
-			const dirPath = prefix ? prefix + "/" + d.name : d.name;
-			if (d.isPage) {
-				items.push({ isDir: false, name: d.name, slug: d.slug, title: d.title, isPublic: d.isPublic, depth });
-				flatten(d, depth + 1, dirPath);
-			} else {
-				items.push({ isDir: true, name: d.name, depth, dirPath });
-				flatten(d, depth + 1, dirPath);
-			}
-		}
-		for (const p of pages) {
-			items.push({ isDir: false, name: p.name, slug: p.slug, title: p.title, isPublic: p.isPublic, depth });
-		}
+		leaves.sort((a, b) => a.name.localeCompare(b.name));
+		const sorted = dirs.concat(leaves);
+		return {
+			name: n.name,
+			slug: n.slug,
+			title: n.title,
+			isPublic: n.isPublic,
+			isPage: n.isPage,
+			isDir: n.children.size > 0 && !n.isPage,
+			dirPath: dirPath || undefined,
+			children: sorted.map((c) => {
+				const childPath = dirPath ? dirPath + "/" + c.name : c.name;
+				return toTree(c, childPath);
+			}),
+		};
 	}
-	flatten(root, 0, "");
-	return items;
+
+	return toTree(root, "").children;
 }
 
 // 슬러그에서 breadcrumb 항목 생성.
@@ -143,7 +142,20 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const user = c.get("user");
 		const store = c.get("store");
 		const pages = await listPages(store, !!user);
-		const items = buildPageTree(pages);
+		// index(홈)를 트리 최상단에, 나머지는 하위 트리로.
+		const indexPage = pages.find((p) => p.slug === "index");
+		const others = pages.filter((p) => p.slug !== "index");
+		const childTree = buildPageTree(others);
+		const items: TreeNode[] = [{
+			name: indexPage?.title || "Home",
+			slug: indexPage?.slug,
+			title: indexPage?.title,
+			isPublic: indexPage?.isPublic ?? true,
+			isPage: true,
+			isDir: false,
+			dirPath: undefined,
+			children: childTree,
+		}];
 		const html = renderTemplate("list", { items }, { title: "All pages", user: !!user, q: "" });
 		return c.html(html);
 	});
