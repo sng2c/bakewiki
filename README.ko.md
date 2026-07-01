@@ -99,11 +99,11 @@ bakewiki remote --url http://... --key bk_xxx get index
 
 ### LLM 명령
 
-`remote`와 동일한 서브커맨드지만, 모든 출력이 stdout에 JSON (에러는 stderr). 스크립트 및 LLM 도구 사용에 적합. → **[LLM CLI 전체 참조 →](docs/cli-llm.md)**
+`remote`와 동일한 서브커맨드지만, LLM에 최적화된 출력. **`get`은 Markdown + YAML frontmatter, 나머지는 JSON.** → **[LLM CLI 전체 참조 →](docs/cli-llm.md)**
 
 ```bash
 bakewiki llm --key bk_xxx list        # → JSON 배열
-bakewiki llm --key bk_xxx get index   # → JSON 객체
+bakewiki llm --key bk_xxx get index   # → Markdown + YAML frontmatter
 bakewiki llm help                     # → JSON 도움말 스키마
 ```
 
@@ -149,11 +149,11 @@ data/
   ```
 - **첨부 파일** — 디렉토리 내의 다른 모든 파일 (이미지 등)
 
-### 제목 해석
+- **`slug`** — 전체 페이지 식별자: `path + "/" + title_segment` (예: `tech/web/HTTP`)
+- **`path`** — 부모 디렉토리 경로 (예: `tech/web`, 루트면 빈 문자열)
+- **`title`** — 표시 제목 (예: `HTTP`)
 
-1. `meta.yml`의 `title` 필드 (명시적 오버라이드)
-2. `index.md`의 첫 `#` 헤딩
-3. 슬러그의 마지막 세그먼트 (예: `tech/web/HTTP` → `HTTP`)
+제목 해석: `meta.yml title` → 첫 `#` 헤딩 → 슬러그 마지막 세그먼트.
 
 ### 링크 해석
 

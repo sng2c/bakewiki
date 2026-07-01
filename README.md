@@ -99,11 +99,11 @@ bakewiki remote --url http://... --key bk_xxx get index
 
 ### LLM commands
 
-Same subcommands as `remote`, but all output is JSON on stdout (errors on stderr). Designed for scripting and LLM tool use. → **[Full LLM CLI reference →](docs/cli-llm.md)**
+Same subcommands as `remote`, but output is optimized for LLMs. **`get` outputs Markdown with YAML frontmatter; all others output JSON.** → **[Full LLM CLI reference →](docs/cli-llm.md)**
 
 ```bash
 bakewiki llm --key bk_xxx list        # → JSON array
-bakewiki llm --key bk_xxx get index   # → JSON object
+bakewiki llm --key bk_xxx get index   # → Markdown + YAML frontmatter
 bakewiki llm help                     # → JSON help schema
 ```
 
@@ -149,11 +149,11 @@ Each page is a directory containing:
   ```
 - **Attachments** — Any other files in the directory (images, etc.)
 
-### Title resolution
+- **`slug`** — Full page identifier: `path + "/" + title_segment` (e.g. `tech/web/HTTP`)
+- **`path`** — Parent directory path (e.g. `tech/web`, empty string for root)
+- **`title`** — Display title (e.g. `HTTP`)
 
-1. `meta.yml` `title` field (explicit override)
-2. First `#` heading in `index.md`
-3. Last segment of the slug (e.g. `tech/web/HTTP` → `HTTP`)
+Title resolution: `meta.yml title` → first `#` heading → slug last segment.
 
 ### Link resolution
 

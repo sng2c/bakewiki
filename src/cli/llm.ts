@@ -9,6 +9,17 @@ function emit(data: unknown): void {
 	process.stdout.write(JSON.stringify(data, null, 2) + "\n");
 }
 
+function emitMarkdown(page: { path: string; slug: string; title: string; content: string; public: boolean; updatedAt: string }): void {
+	const frontmatter = [
+		`path: ${JSON.stringify(page.path)}`,
+		`slug: ${page.slug}`,
+		`title: ${JSON.stringify(page.title)}`,
+		`public: ${page.public}`,
+		`updatedAt: ${page.updatedAt}`,
+	].join("\n");
+	process.stdout.write(`---\n${frontmatter}\n---\n\n${page.content.trimEnd()}\n`);
+}
+
 function fail(message: string): never {
 	process.stderr.write(JSON.stringify({ error: message }) + "\n");
 	process.exit(1);
@@ -49,8 +60,12 @@ export async function llmCommand(subcommand: string, allArgs: string[], opts: Re
 				const slugs = rest;
 				if (slugs.length === 0) fail("Usage: llm get <slug> [slug2 ...]");
 				const results = await Promise.all(slugs.map((s) => client(opts).getPage(s)));
-				// 단일 페이지면 객체, 여러 개면 배열
-				emit(results.length === 1 ? results[0] : results);
+				// 단일 페이지면 Markdown, 여러 개면 배열
+				if (results.length === 1) {
+					emitMarkdown(results[0]);
+				} else {
+					emit(results);
+				}
 				break;
 			}
 
@@ -241,7 +256,7 @@ function llmHelpCommand(): void {
 		},
 		subcommands: {
 			list: { args: [], description: "List all pages" },
-			get: { args: ["<slug>..."], description: "Get page content (one or more slugs)" },
+			get: { args: ["<slug>..."], description: "Get page content as Markdown (single) or JSON (multiple)" },
 			create: { args: ["<slug>", "<file>"], description: "Create or update a page from a markdown file" },
 			rename: { args: ["<old>", "<new>"], description: "Rename a page" },
 			patch: { args: ["<slug>"], options: ["--slug", "--public", "--body", "--title"], description: "Partially update a page" },

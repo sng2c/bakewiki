@@ -1,6 +1,6 @@
 # LLM CLI Reference
 
-`bakewiki llm` provides the same subcommands as `remote`, but all output is JSON on stdout (errors on stderr). Designed for scripting and LLM tool use.
+`bakewiki llm` provides the same subcommands as `remote`, but output is optimized for LLM consumption. **`get` outputs Markdown with YAML frontmatter; all other commands output JSON on stdout** (errors on stderr). Designed for scripting and LLM tool use.
 
 ```bash
 bakewiki llm [options] <command>
@@ -32,8 +32,8 @@ bakewiki llm --key bk_xxx list
 Output:
 ```json
 [
-  { "slug": "index", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-  { "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+  { "path": "", "slug": "index", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+  { "path": "docs", "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
 ]
 ```
 
@@ -41,24 +41,36 @@ Auth: **required**
 
 ### get
 
-Get one or more pages by slug.
+Get a page by slug. **Single page outputs Markdown with YAML frontmatter**; multiple pages output JSON.
 
 ```bash
 bakewiki llm --key bk_xxx get index
-bakewiki llm --key bk_xxx get index docs/api
 ```
 
-Single slug returns an object; multiple slugs return an array.
+Single page output (Markdown):
+```markdown
+---
+path: ""
+slug: index
+title: "Home"
+public: true
+updatedAt: 2026-06-29T12:00:00.000Z
+---
 
-Output:
+# Home
+
+Welcome!
+```
+
+Multiple pages output (JSON):
+```bash
+bakewiki llm --key bk_xxx get index docs/api
+```
 ```json
-{
-  "slug": "index",
-  "title": "Home",
-  "content": "# Home\n\nWelcome!",
-  "public": true,
-  "updatedAt": "2026-06-29T12:00:00.000Z"
-}
+[
+  { "path": "", "slug": "index", "title": "Home", "content": "# Home\n\nWelcome!", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+  { "path": "docs", "slug": "docs/api", "title": "API Docs", "content": "# API Docs\n\n...", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+]
 ```
 
 Auth: **required**
@@ -73,7 +85,7 @@ bakewiki llm --key bk_xxx create my-page ./content.md
 
 Output:
 ```json
-{ "slug": "my-page", "title": "My Page" }
+{ "path": "", "slug": "my-page", "title": "My Page" }
 ```
 
 Auth: **required**
@@ -88,7 +100,7 @@ bakewiki llm --key bk_xxx rename old-slug new-slug
 
 Output:
 ```json
-{ "slug": "new-slug", "title": "New Slug" }
+{ "path": "", "slug": "new-slug", "title": "New Slug" }
 ```
 
 Auth: **required**
@@ -113,7 +125,7 @@ bakewiki llm --key bk_xxx patch my-page --body -   # read body from stdin
 
 Output:
 ```json
-{ "slug": "my-page", "title": "My Page", "public": false, "updatedAt": "2026-06-30T12:00:00.000Z" }
+{ "path": "docs", "slug": "my-page", "title": "My Page", "public": false, "updatedAt": "2026-06-30T12:00:00.000Z" }
 ```
 
 Auth: **required**
@@ -149,7 +161,7 @@ Output:
   "query": "wiki",
   "count": 1,
   "results": [
-    { "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
+    { "path": "", "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
   ]
 }
 ```

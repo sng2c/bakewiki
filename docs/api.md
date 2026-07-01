@@ -16,13 +16,13 @@ Response `200`:
 ```json
 {
   "pages": [
-    { "slug": "index", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-    { "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+    { "path": "", "slug": "index", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+    { "path": "docs", "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
   ]
 }
 ```
 
-Unauthenticated requests only return public pages.
+`path` is the parent directory (empty string for root-level pages). `slug` is the full identifier (`path + "/" + title_segment`).
 
 ### Get page
 
@@ -34,6 +34,7 @@ Response `200`:
 ```json
 {
   "page": {
+    "path": "",
     "slug": "index",
     "title": "Home",
     "content": "# Home\n\nWelcome!",
@@ -41,6 +42,7 @@ Response `200`:
     "updatedAt": "2026-06-29T12:00:00.000Z"
   }
 }
+```
 ```
 
 | Status | Condition |
@@ -66,7 +68,7 @@ If `title` is omitted, it is extracted from the first `#` heading in `content`, 
 
 Response `200`:
 ```json
-{ "slug": "my-page", "title": "My Page", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+{ "path": "", "slug": "my-page", "title": "My Page", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
 ```
 
 | Status | Condition |
@@ -116,7 +118,7 @@ Combine fields:
 
 Response `200`:
 ```json
-{ "slug": "new-name", "title": "New Title", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
+{ "path": "docs", "slug": "docs/new-name", "title": "New Title", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
 ```
 
 | Status | Condition |
@@ -151,7 +153,7 @@ Response `200`:
 ```json
 {
   "results": [
-    { "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
+    { "path": "", "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
   ]
 }
 ```
@@ -195,7 +197,7 @@ Each node in the tree:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `path` | string | Parent directory path (empty string for top level) |
+| `path` | string | Parent directory path (empty string for root-level) |
 | `name` | string | Last segment of the slug |
 | `slug` | string\|undefined | Full page slug (present when directory has an `index.md`) |
 | `title` | string\|undefined | Page title (present when slug exists) |
@@ -236,6 +238,7 @@ Response `200`:
   "filename": "tech/web/HTTP/photo.jpg",
   "original": "photo.jpg",
   "ext": "jpg",
+  "path": "tech/web",
   "slug": "tech/web/HTTP",
   "size": 12345
 }
@@ -263,7 +266,7 @@ Response `200`:
 ```json
 {
   "files": [
-    { "url": "/pages/index/photo.jpg", "filename": "index/photo.jpg", "original": "photo.jpg", "ext": "jpg", "slug": "index", "size": 12345 }
+    { "url": "/pages/index/photo.jpg", "filename": "index/photo.jpg", "original": "photo.jpg", "ext": "jpg", "path": "", "slug": "index", "size": 12345 }
   ]
 }
 ```

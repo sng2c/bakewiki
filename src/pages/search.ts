@@ -8,6 +8,7 @@ import { parseDocument, extractTitle, readMeta } from "./frontmatter.js";
 
 export type SearchResult = {
 	slug: string;
+	path: string;
 	title: string;
 	snippet: string;
 };
@@ -92,7 +93,7 @@ export function removeFromSearchIndex(slug: string): void {
 // ── 검색 ──
 export function searchPages(query: string, includePrivate = false): SearchResult[] {
 	const lower = query.toLowerCase();
-	const results: Array<{ slug: string; title: string; snippet: string; rank: number }> = [];
+	const results: Array<{ slug: string; path: string; title: string; snippet: string; rank: number }> = [];
 	for (const [slug, entry] of index) {
 		if (!includePrivate && !entry.isPublic) continue;
 		const titleMatch = entry.title.toLowerCase().includes(lower);
@@ -117,7 +118,8 @@ export function searchPages(query: string, includePrivate = false): SearchResult
 		}
 
 		const rank = titleMatch ? 2 : 1;
-		results.push({ slug, title: entry.title, snippet, rank });
+		const pathIdx = slug.lastIndexOf("/");
+		results.push({ slug, path: pathIdx < 0 ? "" : slug.substring(0, pathIdx), title: entry.title, snippet, rank });
 	}
 	results.sort((a, b) => b.rank - a.rank);
 	return results;

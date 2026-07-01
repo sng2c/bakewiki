@@ -5,6 +5,12 @@ import { requireAuth } from "../auth/middleware.js";
 import { createPage, updatePage, getPage, deletePage, renamePage, listPages } from "../pages/store.js";
 import { parseDocument } from "../pages/frontmatter.js";
 
+// slug에서 부모 경로 추출: "tech/web/HTTP" → "tech/web", "index" → ""
+function parentPath(slug: string): string {
+	const idx = slug.lastIndexOf("/");
+	return idx < 0 ? "" : slug.substring(0, idx);
+}
+
 // slug 검증: 빈 문자열, "..", 선행/후행 "/" 금지
 function validSlug(slug: string | undefined): slug is string {
 	if (!slug || slug.startsWith("/") || slug.endsWith("/")) return false;
@@ -20,7 +26,7 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		const user = c.get("user");
 		const store = c.get("store");
 		const list = await listPages(store, !!user);
-		return c.json({ pages: list.map(p => ({ slug: p.slug, title: p.title, public: p.isPublic, updatedAt: p.updatedAt })) });
+		return c.json({ pages: list.map(p => ({ path: parentPath(p.slug), slug: p.slug, title: p.title, public: p.isPublic, updatedAt: p.updatedAt })) });
 	});
 
 	// 단일 문서. 비공개 문서는 미인증 → 404.
@@ -37,7 +43,7 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		if (!page.isPublic && !user) {
 			return c.json({ error: "Not found" }, 404);
 		}
-		return c.json({ page: { slug: page.slug, title: page.title, content: page.content, public: page.isPublic, updatedAt: page.updatedAt } });
+		return c.json({ page: { path: parentPath(page.slug), slug: page.slug, title: page.title, content: page.content, public: page.isPublic, updatedAt: page.updatedAt } });
 	});
 
 	// 생성 또는 수정 (upsert). 관리자 전용.
@@ -61,6 +67,7 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 			: await createPage(store, slug, content, { title });
 
 		return c.json({
+			path: parentPath(saved!.slug),
 			slug: saved!.slug,
 			title: saved!.title,
 			public: saved!.isPublic,
@@ -117,12 +124,12 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 			if (hasPublic) options.isPublic = body.public as boolean;
 			if (hasTitle) options.title = body.title as string;
 			const saved = await updatePage(store, currentSlug, content, options);
-			return c.json({ slug: saved!.slug, title: saved!.title, public: saved!.isPublic, updatedAt: saved!.updatedAt });
+			return c.json({ path: parentPath(saved!.slug), slug: saved!.slug, title: saved!.title, public: saved!.isPublic, updatedAt: saved!.updatedAt });
 		}
 
 		// slug만 변경한 경우
 		const page = await getPage(store, currentSlug);
-		return c.json({ slug: page!.slug, title: page!.title, public: page!.isPublic, updatedAt: page!.updatedAt });
+		return c.json({ path: parentPath(page!.slug), slug: page!.slug, title: page!.title, public: page!.isPublic, updatedAt: page!.updatedAt });
 	});
 
 

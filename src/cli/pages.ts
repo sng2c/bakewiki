@@ -25,36 +25,36 @@ export class BakewikiClient {
 		return { ok: res.ok, status: res.status, data };
 	}
 
-	async listPages(): Promise<{ slug: string; title: string; public: boolean; updatedAt: string }[]> {
+	async listPages(): Promise<{ path: string; slug: string; title: string; public: boolean; updatedAt: string }[]> {
 		const { ok, data } = await this.request("GET", "/api/pages");
 		if (!ok) throw new Error(`Failed to list pages: ${JSON.stringify(data)}`);
-		const pages = (data as { pages: { slug: string; title: string; public: boolean; updatedAt: string }[] }).pages;
+		const pages = (data as { pages: { path: string; slug: string; title: string; public: boolean; updatedAt: string }[] }).pages;
 		return pages;
 	}
 
-	async getPage(slug: string): Promise<{ slug: string; title: string; public: boolean; updatedAt: string; content: string }> {
+	async getPage(slug: string): Promise<{ path: string; slug: string; title: string; public: boolean; updatedAt: string; content: string }> {
 		const { ok, status, data } = await this.request("GET", `/api/pages/${slug}`);
 		if (!ok) throw new Error(`Page not found: ${slug}`);
-		const page = (data as { page: { slug: string; title: string; public: boolean; updatedAt: string; content: string } }).page;
+		const page = (data as { page: { path: string; slug: string; title: string; public: boolean; updatedAt: string; content: string } }).page;
 		return page;
 	}
 
-	async createPage(slug: string, content: string): Promise<{ slug: string; title: string }> {
+	async createPage(slug: string, content: string): Promise<{ path: string; slug: string; title: string }> {
 		const { ok, data } = await this.request("POST", `/api/pages/${slug}`, { content });
 		if (!ok) throw new Error(`Failed to create page: ${JSON.stringify(data)}`);
-		return data as { slug: string; title: string };
+		return data as { path: string; slug: string; title: string };
 	}
 
-	async renamePage(oldSlug: string, newSlug: string): Promise<{ slug: string; title: string }> {
+	async renamePage(oldSlug: string, newSlug: string): Promise<{ path: string; slug: string; title: string }> {
 		const { ok, status, data } = await this.request("PATCH", `/api/pages/${oldSlug}`, { slug: newSlug });
 		if (!ok) throw new Error(`Failed to rename page: ${JSON.stringify(data)} (status ${status})`);
-		return data as { slug: string; title: string };
+		return data as { path: string; slug: string; title: string };
 	}
 
-	async patchPage(slug: string, fields: { slug?: string; public?: boolean; body?: string }): Promise<{ slug: string; title: string; public: boolean; updatedAt: string }> {
+	async patchPage(slug: string, fields: { slug?: string; public?: boolean; body?: string; title?: string }): Promise<{ path: string; slug: string; title: string; public: boolean; updatedAt: string }> {
 		const { ok, status, data } = await this.request("PATCH", `/api/pages/${slug}`, fields);
 		if (!ok) throw new Error(`Failed to patch page: ${JSON.stringify(data)} (status ${status})`);
-		return data as { slug: string; title: string; public: boolean; updatedAt: string };
+		return data as { path: string; slug: string; title: string; public: boolean; updatedAt: string };
 	}
 
 	async deletePage(slug: string): Promise<void> {
@@ -62,10 +62,10 @@ export class BakewikiClient {
 		if (!ok) throw new Error(`Failed to delete page: ${JSON.stringify(data)}`);
 	}
 
-	async searchPages(query: string): Promise<{ slug: string; title: string; snippet: string }[]> {
+	async searchPages(query: string): Promise<{ path: string; slug: string; title: string; snippet: string }[]> {
 		const { ok, data } = await this.request("GET", `/api/search?q=${encodeURIComponent(query)}`);
 		if (!ok) throw new Error(`Failed to search: ${JSON.stringify(data)}`);
-		return (data as { results: { slug: string; title: string; snippet: string }[] }).results;
+		return (data as { results: { path: string; slug: string; title: string; snippet: string }[] }).results;
 	}
 
 	async sitemap(): Promise<{ name: string; path: string; slug?: string; children?: Record<string, unknown> }[]> {
@@ -201,6 +201,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 				const page = await client.getPage(slugs[i]);
 				const body = page.content;
 				if (i > 0) console.log("----");
+				console.log(`path:    ${page.path}`);
 				console.log(`slug:    ${page.slug}`);
 				console.log(`title:   ${page.title}`);
 				console.log(`public:  ${page.public}`);
@@ -305,6 +306,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 				const r = results[i];
 				const snippet = r.snippet.replace(/<[^>]+>/g, "").trim();
 				if (i > 0) console.log("----");
+				console.log(`path:    ${r.path}`);
 				console.log(`slug:    ${r.slug}`);
 				console.log(`title:   ${r.title}`);
 				if (snippet) console.log(`snippet: ${snippet}`);
@@ -461,7 +463,7 @@ async function fileCommand(sub: string | undefined, args: string[], opts: Remote
 
 
 // 페이지 목록을 path 트리로 출력.
-function printPageTree(pages: Array<{ slug: string; title: string; public: boolean; updatedAt: string }>): void {
+function printPageTree(pages: Array<{ path: string; slug: string; title: string; public: boolean; updatedAt: string }>): void {
 	type TreeNode = {
 		name: string;
 		slug?: string;

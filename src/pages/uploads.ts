@@ -51,6 +51,12 @@ function extractExt(filename: string): string {
 	return m ? m[1].toLowerCase() : "";
 }
 
+// slug에서 부모 경로 추출
+function parentPath(slug: string): string {
+	const idx = slug.lastIndexOf("/");
+	return idx < 0 ? "" : slug.substring(0, idx);
+}
+
 export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
 	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
@@ -87,7 +93,7 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 		const ext = extractExt(original);
 		const slugDir = slugToUploadDir(slug);
 		const url = slug ? `/pages/${slug}/${original}` : `/uploads/${TEMP_BUCKET}/${original}`;
-		return c.json({ url, filename: `${slugDir}/${original}`, original, ext, slug, size: file.size });
+		return c.json({ url, filename: `${slugDir}/${original}`, original, ext, path: parentPath(slug) || "", slug: slug || "", size: file.size });
 	});
 
 	// All uploads list. Admin only.
@@ -141,12 +147,14 @@ export function buildUploadUrl(slug: string, original: string): string {
 	return `/pages/${slugDir}/${original}`;
 }
 
+type UploadEntry = { url: string; filename: string; original: string; ext: string; path: string; slug: string; size: number };
+
 // List uploads, optionally filtered by slug.
 async function listUploadsFor(
 	dataDir: string,
 	slug: string | undefined,
-): Promise<Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }>> {
-	const files: Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }> = [];
+): Promise<UploadEntry[]> {
+	const files: UploadEntry[] = [];
 
 	if (slug !== undefined) {
 		// List files in a specific page's directory
@@ -167,6 +175,7 @@ async function listUploadsFor(
 					filename: `${slug}/${name}`,
 					original: name,
 					ext: extractExt(name),
+					path: parentPath(slug),
 					slug,
 					size: stat.size,
 				});
@@ -197,6 +206,7 @@ async function listUploadsFor(
 					filename: `${TEMP_BUCKET}/${name}`,
 					original: name,
 					ext: extractExt(name),
+					path: "",
 					slug: "",
 					size: stat.size,
 				});
@@ -213,7 +223,7 @@ async function listUploadsFor(
 async function walkForUploads(
 	pagesRoot: string,
 	dir: string,
-	files: Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }>,
+	files: UploadEntry[],
 ): Promise<void> {
 	let entries: import("node:fs").Dirent[];
 	try {
@@ -252,6 +262,7 @@ async function walkForUploads(
 						filename: `${slug}/${name}`,
 						original: name,
 						ext: extractExt(name),
+						path: parentPath(slug),
 						slug,
 						size: stat.size,
 					});
