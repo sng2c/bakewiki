@@ -1,5 +1,11 @@
 // bakewiki page rendering. Loaded from layout.hbs when needsPageRender is set.
 // CDN deps: markdown-it, highlight.js, KaTeX.
+
+// Vite HMR (dev mode only, no-op in production)
+if (import.meta.hot) {
+	import.meta.hot.accept();
+}
+
 (function () {
 	var raw = document.getElementById('page-data');
 	if (!raw) return;

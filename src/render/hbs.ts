@@ -42,11 +42,11 @@ article { padding: 1rem; margin-top: 1rem; }
 article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
 .page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
-.page-header nav[aria-label="breadcrumb"] { margin:0; }
-.page-header nav[aria-label="breadcrumb"] ul { margin:0; padding:0; display:flex; align-items:center; gap:0.15em; font-size:0.85rem; list-style:none; }
-.page-header nav[aria-label="breadcrumb"] li { margin:0; padding:0; }
-.page-header nav[aria-label="breadcrumb"] li::before { content:"›"; color:var(--pico-muted-color,#999); margin-right:0.15em; }
-.page-header nav[aria-label="breadcrumb"] li:first-child::before { content:none; }
+.page-header nav[aria-label="breadcrumb"] { margin:0; padding:0; }
+.page-header nav[aria-label="breadcrumb"] ul { margin:0!important; padding:0!important; display:inline-flex!important; flex-direction:row!important; align-items:center; gap:0; font-size:0.85rem; list-style:none!important; }
+.page-header nav[aria-label="breadcrumb"] ul li { margin:0!important; padding:0!important; display:inline!important; }
+.page-header nav[aria-label="breadcrumb"] ul li::before { content:"›"; color:var(--pico-muted-color,#999); margin:0 0.3em; }
+.page-header nav[aria-label="breadcrumb"] ul li:first-child::before { content:none; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
@@ -73,14 +73,16 @@ fieldset { min-width:0; max-width:100%; }
 </nav>
 {{#if needsPageRender}}
 ${RENDER_SCRIPTS}
-<script src="/static/page.js" defer></script>
+{{#if devMode}}<script type="module" src="/@vite/client"></script>
+<script type="module" src="/src/client/page.ts"></script>{{else}}<script src="/static/page.js" defer></script>{{/if}}
 {{/if}}
 <main class="container">
 {{{body}}}
 </main>
 {{#if needsRender}}
 ${RENDER_SCRIPTS}
-<script src="/static/editor.js" defer></script>
+{{#if devMode}}<script type="module" src="/@vite/client"></script>
+<script type="module" src="/src/client/editor.ts"></script>{{else}}<script src="/static/editor.js" defer></script>{{/if}}
 {{/if}}
 <script>function copySlug(s){navigator.clipboard.writeText(s).then(function(){event.target.textContent='Copied!';setTimeout(function(){event.target.textContent='Copy slug'},2000)})}</script>
 </body>
@@ -204,6 +206,10 @@ ${RENDER_SCRIPTS}
 </article>`,
 };
 
+// Vite 개발 모드 플래그 (serve.ts에서 설정)
+let _devMode = false;
+export function setDevMode(dev: boolean): void { _devMode = dev; }
+
 export function renderTemplate(name: string, data: Record<string, unknown>, layoutData?: Record<string, unknown>): string {
 	const tmpl = cache.get(name) ?? Handlebars.compile(TEMPLATES[name]);
 	if (!cache.has(name)) cache.set(name, tmpl);
@@ -211,7 +217,7 @@ export function renderTemplate(name: string, data: Record<string, unknown>, layo
 	if (layoutData || name === "notFound") {
 		const layout = cache.get("layout") ?? Handlebars.compile(TEMPLATES.layout);
 		if (!cache.has("layout")) cache.set("layout", layout);
-		return layout({ ...layoutData, body, title: layoutData?.title ?? name });
+		return layout({ ...layoutData, body, title: layoutData?.title ?? name, devMode: _devMode });
 	}
 	return body;
 }

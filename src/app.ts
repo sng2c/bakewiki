@@ -78,7 +78,9 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 	// 임시 업로드 버킷 서빙: /uploads/_/ (새 페이지 생성 전 임시 파일)
 	app.use("/uploads/*", serveStatic({ root: store.dataDir }));
 
-	// 정적 JS 자산 서빙 (/static/* → publicDir/*).
+	// 정적 JS 자산 서빙 (/static/*).
+	// 개발 모드: Vite 미들웨어가 serve.ts에서 처리
+	// 프로덕션 모드: serveStatic
 	app.use("/static/*", serveStatic({ root: publicDir(), rewriteRequestPath: (p) => p.replace(/^\/static/, "") }));
 
 	// 검색 API (SPEC: /api/search)

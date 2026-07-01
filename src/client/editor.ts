@@ -1,6 +1,12 @@
 // bakewiki editor. Loaded from editor.hbs.
 // Live preview + image upload (drag/paste/select) → list → insert/delete buttons.
 // CDN deps: markdown-it, highlight.js, KaTeX.
+
+// Vite HMR (dev mode only, no-op in production)
+if (import.meta.hot) {
+	import.meta.hot.accept();
+}
+
 (function () {
 	var md = window.markdownit({
 		html: true,
