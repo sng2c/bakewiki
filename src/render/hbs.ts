@@ -15,8 +15,8 @@ const CDN = {
 Handlebars.registerHelper("eq", (a, b) => a === b);
 Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 
-// 재귀 트리 노드 partial — 페이지/폴더 목록을 중첩 ul로 렌더링.
-Handlebars.registerPartial("treeNode", `{{#each children}}<li class="{{#if isDir}}tree-dir{{else}}tree-page{{/if}}">{{#if isDir}}<span class="tree-folder"><a href="/pages/{{dirPath}}">📁 {{name}}/</a></span>{{#if children.length}}<ul>{{> treeNode children=children}}{{/if}}{{else}}<a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em>untitled</em>{{/if}}</a> <small class="tree-meta">{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{/if}}</li>{{/each}}`);
+// 재귀 트리 노드 partial — 모든 노드를 li로 출력. 가상 폴더는 빈 페이지 링크로 표시.
+Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isDir}}{{dirPath}}{{else}}{{slug}}{{/if}}">{{#if isDir}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a> <small class="tree-meta">{{#if isDir}}{{dirPath}}{{else}}{{slug}}{{/if}}{{#unless isPublic}} 🔒{{/unless}}</small> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isDir}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
 
 // Template compile cache (name → compiled function)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
@@ -65,11 +65,15 @@ article > :last-child { margin-bottom: 0; }
 .edit-fab [data-lucide], .edit-fab svg { width:1.1rem; height:1.1rem; }
 .fab-label { font-size:0.75rem; font-weight:600; }
 .fab-group { position:fixed; bottom:1rem; right:1rem; z-index:50; display:flex; flex-direction:column; gap:0.6rem; }
-ul.page-tree, .page-tree ul { list-style:none; padding-left:1.2rem; margin:0; }
+ul.page-tree, .page-tree ul { list-style:none!important; padding-left:1.2rem; margin:0; }
 ul.page-tree { padding-left:0; }
-.page-tree li { margin:0.15rem 0; }
+.page-tree li { margin:0.15rem 0; padding:0; list-style:none!important; }
+.page-tree li::marker { content:none; }
+.page-tree ul li::before { content:none!important; }
+.page-tree a { text-decoration:none; }
+.page-tree a:hover { text-decoration:underline; }
 .page-tree .tree-folder a { font-weight:500; }
-.page-tree .tree-meta { color:var(--pico-muted-color,#999); }
+.page-tree .tree-meta { color:var(--pico-muted-color,#999); font-size:0.75rem; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
