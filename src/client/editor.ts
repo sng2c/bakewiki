@@ -169,13 +169,16 @@ if (import.meta.hot) {
 		var isImage = item.ext && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].indexOf(item.ext) !== -1;
 		var preview;
 		if (isImage) {
-			preview = document.createElement('img');
-			preview.src = item.url;
-			preview.alt = '';
-			preview.style.cssText = 'max-height:48px;max-width:48px;object-fit:cover;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee)';
+			preview = document.createElement('span');
+			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee);overflow:hidden;flex-shrink:0';
+			var img = document.createElement('img');
+			img.src = item.url;
+			img.alt = '';
+			img.style.cssText = 'width:48px;height:48px;object-fit:cover';
+			preview.appendChild(img);
 		} else {
 			preview = document.createElement('span');
-			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee)';
+			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee);flex-shrink:0';
 			var fileIcon = document.createElement('i');
 			fileIcon.setAttribute('data-lucide', 'file');
 			fileIcon.style.cssText = 'width:24px;height:24px;color:var(--pico-muted-color,#999)';
