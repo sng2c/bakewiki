@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
 import { getPage, listPages } from "../pages/store.js";
-import { searchPages } from "../pages/search.js";
+import { effectiveVisibility, getPageMap, searchPages } from "../pages/search.js";
 import { parseDocument, extractTitle } from "../pages/frontmatter.js";
 import { renderTemplate } from "../render/hbs.js";
 
@@ -10,7 +10,9 @@ type TreeNode = {
 	name: string;
 	slug?: string;
 	title?: string;
+	href: string;           // 링크 URL (index는 "/", 나머지는 "/pages/<slug>")
 	isPublic?: boolean;
+	inheritedPrivate?: boolean;  // public 설정이지만 상위 때문에 비공개
 	isPage: boolean;       // 실제 index.md 존재 여부
 	isEmpty: boolean;      // index.md 없는 폴더 (빈 페이지)
 	isDir: boolean;
@@ -18,9 +20,26 @@ type TreeNode = {
 	children: TreeNode[];
 };
 
-type FlatItem = TreeNode;
+// 비인증 사용자를 위해 private/inherited_private 페이지와 그 하위를 가지치기.
+function prunePrivate(nodes: TreeNode[]): TreeNode[] {
+	return nodes
+		.filter((n) => {
+			// private 페이지는 숨김
+			if (n.isPage && !n.isPublic) return false;
+			// inherited_private도 비인증에게 숨김
+			if (n.isPage && n.inheritedPrivate) return false;
+			return true;
+		})
+		.map((n) => {
+			const children = prunePrivate(n.children);
+			// 빈 폴더이고 자식이 모두 숨겨지면 이 노드도 숨김
+			if (!n.isPage && children.length === 0) return null;
+			return { ...n, children };
+		})
+		.filter((n): n is TreeNode => n !== null);
+}
 
-function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>): TreeNode[] {
+function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>, pageMap?: Map<string, { isPublic: boolean }>): TreeNode[] {
 	type RawNode = {
 		name: string;
 		slug?: string;
@@ -68,11 +87,16 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 		dirs.sort((a, b) => a.name.localeCompare(b.name));
 		leaves.sort((a, b) => a.name.localeCompare(b.name));
 		const sorted = dirs.concat(leaves);
+		const inheritedPrivate = n.isPage && n.isPublic && pageMap
+			? effectiveVisibility(n.slug!, true, pageMap) === "inherited_private" ? true : undefined
+			: undefined;
 		return {
 			name: n.name,
 			slug: n.slug,
 			title: n.title,
+			href: n.slug ? `/pages/${n.slug}` : `/pages/${dirPath}`,
 			isPublic: n.isPage ? n.isPublic : undefined,  // 빈 폴더는 public/private 구분 없음
+			inheritedPrivate,
 			isPage: n.isPage,
 			isEmpty: !n.isPage,                           // index.md 없으면 빈 페이지
 			isDir: n.children.size > 0 && !n.isPage,
@@ -119,12 +143,16 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 			? `# ${title}\n\n> This page doesn\u2019t have any content yet.\n\n[Write this page \u2192](/edit/${slug})`
 			: `# ${title}\n\n> This page doesn\u2019t have any content yet.\n\n[Log in](/login) to write this page.`;
 		return renderTemplate("page", {
-			page: { isPublic: true, updatedAt: "—" },
+			page: { isPublic: true, updatedAt: "\u2014" },
 			breadcrumb, body, title, slug, user: authed,
 		}, { title: `${title} - bakewiki`, user: authed, q: "", needsPageRender: true });
 	}
-	if (!page.isPublic && !authed) {
-		// private 페이지: 비인증에게는 빈 페이지처럼 안내
+	// 상속 private 확인
+	const pageMap = getPageMap();
+	const vis = effectiveVisibility(slug, page.isPublic, pageMap);
+
+	if (!authed && vis !== "public") {
+		// 비인증: private 또는 inherited_private → 안내
 		const title = page.title;
 		const breadcrumb = buildBreadcrumb(slug, title);
 		const body = `# ${title}\n\nThis page is private.\n\n[Log in](/login) to view it.`;
@@ -133,12 +161,14 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 			breadcrumb, body, title, slug, user: false,
 		}, { title: `${title} - bakewiki`, user: false, q: "", needsPageRender: true });
 	}
+
+	const inheritedPrivate = vis === "inherited_private";
 	const doc = parseDocument(page.content);
 	const title = page.title;
 	const breadcrumb = buildBreadcrumb(slug, title);
 	const body = `# ${title}\n\n${doc.body}`;
 	return renderTemplate("page", {
-		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
+		page: { ...page, updatedAt: page.updatedAt.slice(0, 10), inheritedPrivate: inheritedPrivate || undefined },
 		breadcrumb, body, title, slug, user: authed,
 	}, { title: title || page.slug, user: authed, q: "", needsPageRender: true });
 }
@@ -146,34 +176,25 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
 	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
-	// 홈 = /index 페이지.
+	// 홈 = config.homeSlug 페이지.
 	app.get("/", async (c) => {
 		const user = c.get("user");
 		const store = c.get("store");
-		return c.html(await renderPage(store, "index", !!user));
+		return c.html(await renderPage(store, store.config.homeSlug, !!user));
 	});
 
 	// 전체 목록 (/pages)
 	app.get("/pages", async (c) => {
 		const user = c.get("user");
 		const store = c.get("store");
-		const pages = await listPages(store, !!user);
-		// index(홈)를 트리 최상단에, 나머지는 하위 트리로.
-		const indexPage = pages.find((p) => p.slug === "index");
-		const others = pages.filter((p) => p.slug !== "index");
-		const childTree = buildPageTree(others);
-		const items: TreeNode[] = [{
-			name: indexPage?.title || "Home",
-			slug: indexPage?.slug,
-			title: indexPage?.title,
-			isPublic: indexPage?.isPublic ?? true,
-			isPage: true,
-			isEmpty: false,
-			isDir: false,
-			dirPath: undefined,
-			children: childTree,
-		}];
-		const html = renderTemplate("list", { items }, { title: "All pages", user: !!user, q: "" });
+		// 모든 페이지로 트리 빌드 후, 비인증 시 private/inherited_private 가지치기.
+		const allPages = await listPages(store, true);
+		const pageMap = getPageMap();
+		let items = buildPageTree(allPages, pageMap);
+		if (!user) {
+			items = prunePrivate(items);
+		}
+		const html = renderTemplate("list", { items, homeSlug: store.config.homeSlug }, { title: "All pages", user: !!user, q: "" });
 		return c.html(html);
 	});
 

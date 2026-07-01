@@ -23,6 +23,7 @@ if (import.meta.hot) {
 	});
 
 	var pathInput = document.querySelector('input[name=path]');
+	var titleInput = document.querySelector('input[name=title]');
 	var originalSlug = document.querySelector('input[name=originalSlug]');
 	var ta = document.getElementById('editor-content');
 	var pv = document.getElementById('editor-preview');
@@ -108,7 +109,9 @@ if (import.meta.hot) {
 	};
 
 	function update() {
-		pv.innerHTML = md.render(ta.value);
+		var title = titleInput ? titleInput.value.trim() : '';
+		var body = title ? '# ' + title + '\n\n' + ta.value : ta.value;
+		pv.innerHTML = md.render(body);
 		if (window.renderMathInElement) {
 			renderMathInElement(pv, {
 				delimiters: [
@@ -124,6 +127,7 @@ if (import.meta.hot) {
 
 	ta.addEventListener('input', debounce);
 	if (pathInput) pathInput.addEventListener('input', debounce);
+	if (titleInput) titleInput.addEventListener('input', debounce);
 	update();
 
 	// ── Insert text at cursor ──

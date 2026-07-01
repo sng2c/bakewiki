@@ -17,7 +17,7 @@ Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 
 // 재귀 트리 노드 partial — 모든 노드를 li로 출력.
 // 실제 페이지: file-text 아이콘 + 제목 / 빈 페이지: file 아이콘 + 회색 / private: lock 아이콘
-Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}" class="{{#if isEmpty}}empty{{/if}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}{{#if isPublic}}<i data-lucide="file-text" class="tree-icon"></i>{{else}}<i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/if}}{{/if}} {{#if isEmpty}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
+Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="{{href}}" class="{{#if isEmpty}}empty{{/if}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}{{#if (eq slug @root.homeSlug)}}<i data-lucide="home" class="tree-icon" title="home"></i>{{else}}{{#if isPublic}}{{#if inheritedPrivate}}<i data-lucide="eye-off" class="tree-icon tree-inherited" title="protected"></i>{{else}}<i data-lucide="file-text" class="tree-icon"></i>{{/if}}{{else}}<i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/if}}{{/if}}{{/if}} {{#if isEmpty}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
 
 // Template compile cache (name → compiled function)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
@@ -81,12 +81,15 @@ ul.page-tree { padding-left:0; }
 .page-tree .tree-folder a { font-weight:500; }
 .page-tree .tree-meta { color:var(--pico-muted-color,#999); font-size:0.75rem; }
 .page-tree a.empty { color:var(--pico-muted-color,#999); font-style:italic; }
+.page-tree .tree-inherited { color:var(--pico-muted-color,#999); }
+.page-tree .tree-lock { }
 .page-tree .tree-icon, .page-tree .tree-icon svg { width:13px!important; height:13px!important; vertical-align:-2px; display:inline-block; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
 #editor-uploads { overflow:hidden; word-break:break-all; }
 .upload-item { overflow:hidden; }
+input[readonly] { opacity:0.6; cursor:not-allowed; }
 .preview-pane { border:1px solid var(--pico-muted-border-color,#ccc); border-radius:var(--pico-border-radius,0.25rem); padding:1rem; min-height:320px; overflow:auto; background:var(--pico-card-background-color,#f8f8f8); }
 </style>
 </head>
@@ -123,7 +126,7 @@ ${RENDER_SCRIPTS}
 </body>
 </html>`,
 
-	page: `{{#if user}}<div class="fab-group"><a href="/edit" class="edit-fab" title="New page"><i data-lucide="plus"></i><span class="fab-label">New</span></a><a href="/edit/{{slug}}" class="edit-fab" title="Edit page"><i data-lucide="pencil"></i><span class="fab-label">Edit</span></a></div>{{/if}}
+	page: `{{#if user}}<div class="fab-group"><a href="/edit?path={{slug}}" class="edit-fab" title="New page"><i data-lucide="plus"></i><span class="fab-label">New</span></a><a href="/edit/{{slug}}" class="edit-fab" title="Edit page"><i data-lucide="pencil"></i><span class="fab-label">Edit</span></a></div>{{/if}}
 <div class="page-header">
 <div class="page-header-left">
 <nav aria-label="breadcrumb"><ul>
@@ -133,7 +136,7 @@ ${RENDER_SCRIPTS}
 </ul></nav>
 <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:14px;height:14px"></i></span>
 </div>
-<small class="page-meta">{{#if page.isPublic}}<i data-lucide="globe" style="width:13px;height:13px;vertical-align:-2px"></i> public{{else}}<i data-lucide="lock" style="width:13px;height:13px;vertical-align:-2px"></i> <strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
+<small class="page-meta">{{#if page.inheritedPrivate}}<i data-lucide="eye-off" style="width:13px;height:13px;vertical-align:-2px"></i> <strong>protected</strong>{{else}}{{#if page.isPublic}}<i data-lucide="globe" style="width:13px;height:13px;vertical-align:-2px"></i> public{{else}}<i data-lucide="lock" style="width:13px;height:13px;vertical-align:-2px"></i> <strong>private</strong>{{/if}}{{/if}} · updated {{page.updatedAt}}</small>
 </div>
 <article id="page-content" data-slug="{{slug}}" style="white-space:pre-wrap">{{body}}</article>
 <div id="page-attachments" style="margin-top:1.5rem"></div>`,
@@ -142,7 +145,7 @@ ${RENDER_SCRIPTS}
 	list: `<h1>All pages</h1>
 <ul class="page-tree">
 {{#each items}}
-<li class="tree-node"><a href="/pages/{{slug}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}{{#if isPublic}}<i data-lucide="file-text" class="tree-icon"></i>{{else}}<i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/if}}{{/if}} {{#if title}}{{title}}{{else}}{{name}}{{/if}}</a> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
+<li class="tree-node"><a href="{{href}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}{{#if (eq slug @root.homeSlug)}}<i data-lucide="home" class="tree-icon" title="home"></i>{{else}}{{#if isPublic}}{{#if inheritedPrivate}}<i data-lucide="eye-off" class="tree-icon tree-inherited" title="protected"></i>{{else}}<i data-lucide="file-text" class="tree-icon"></i>{{/if}}{{else}}<i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/if}}{{/if}}{{/if}} {{#if title}}{{title}}{{else}}{{name}}{{/if}}</a> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
 {{/each}}
 </ul>`,
 
@@ -179,10 +182,10 @@ ${RENDER_SCRIPTS}
 <form action="/edit" method="post">
 <input type="hidden" name="originalSlug" value="{{#if page}}{{page.slug}}{{/if}}">
 <label>Title
-<input type="text" name="title" value="{{title}}">
+<input type="text" name="title" value="{{title}}" {{#if isHome}}readonly{{/if}}>
 </label>
 <label>Path <small>e.g. tech/web — leave empty for root</small>
-<input type="text" name="path" value="{{path}}">
+<input type="text" name="path" value="{{path}}" {{#if isHome}}readonly{{/if}}>
 </label>
 <label>
 <input type="checkbox" name="public" {{#if public}}checked{{/if}}> Public
@@ -200,7 +203,6 @@ ${RENDER_SCRIPTS}
 </fieldset>
 <div>
 <button type="submit">Save</button>
-{{#if page}}<a href="/pages/{{page.slug}}" class="secondary">cancel</a>{{/if}}
 </div>
 </div>
 <div>
@@ -208,13 +210,23 @@ ${RENDER_SCRIPTS}
 <div class="preview-pane" id="editor-preview"></div>
 </div>
 </div>
-</form>`,
+</form>
+{{#if page}}<form action="/delete/{{page.slug}}" method="post" style="margin-top:1rem" onsubmit="return confirm('Delete this page?')"><button type="submit" class="outline secondary" style="color:var(--pico-form-element-invalid-focus-color,#c0392b)">Delete</button></form>{{/if}}`,
 
 	settings: `<article>
 <h1>Settings</h1>
 <h2>Account</h2>
 <p>Email: <strong>{{email}}</strong></p>
 <form action="/logout" method="post"><button type="submit" class="outline secondary">Logout</button></form>
+<h2>Homepage</h2>
+<p>The slug of the page shown at <code>/</code>.</p>
+<form action="/settings/home" method="post">
+<label>Home page slug
+<input type="text" name="homeSlug" value="{{homeSlug}}" placeholder="home">
+</label>
+<button type="submit">Save</button>
+</form>
+{{#if homeSaved}}<p><small style="color:green">Homepage updated.</small></p>{{/if}}
 <h2>API Key</h2>
 {{#if apiKey}}
 <div style="display:flex;align-items:center;gap:0.5rem">

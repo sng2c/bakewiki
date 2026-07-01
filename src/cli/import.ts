@@ -37,7 +37,7 @@ export async function importCommand(dir: string, dataDir?: string): Promise<void
 		await writeMeta(metaPath(resolvedDataDir, slug), { public: isPublic, updatedAt });
 
 		// 검색 인덱스 갱신
-		const title = slug === "index" ? "index" : slug.split("/").pop()!;
+		const title = extractTitle(doc) ?? slug.split("/").pop()!;
 		upsertSearchIndex(slug, extractTitle(doc) ?? title, doc.body, isPublic, updatedAt);
 
 		created++;

@@ -26,27 +26,8 @@ const index = new Map<string, IndexEntry>();
 export async function buildSearchIndex(dataDir: string): Promise<void> {
 	index.clear();
 	const root = pagesDir(dataDir);
-	// 루트(pages/) 자체도 index 페이지일 수 있음 (slug = "index")
-	await indexPageDir(root, root, "");
+	// 모든 페이지는 pages/<slug>/index.md 형태로 저장 (index도 pages/index/)
 	await walkAndIndex(root, root);
-}
-
-// 루트 디렉토리(pages/)를 index 페이지로 인식.
-async function indexPageDir(root: string, dir: string, parentSlug: string): Promise<void> {
-	const idxPath = path.join(dir, "index.md");
-	try {
-		const stat = await fs.stat(idxPath);
-		if (stat.isFile()) {
-			const slug = parentSlug || "index";
-			const content = await fs.readFile(idxPath, "utf-8");
-			const meta = await readMeta(path.join(dir, "meta.yml"));
-			const doc = parseDocument(content);
-			const title = meta.title ?? extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
-			index.set(slug, { title, content: doc.body, isPublic: meta.public, updatedAt: meta.updatedAt });
-		}
-	} catch {
-		// index.md 없음 — 페이지 아님
-	}
 }
 
 // 디렉토리 순회: 하위 디렉토리의 index.md가 있으면 페이지로 인식.
@@ -66,11 +47,11 @@ async function walkAndIndex(root: string, dir: string): Promise<void> {
 		try {
 			const stat = await fs.stat(idxPath);
 			if (stat.isFile()) {
-				const slug = subSlug || "index";
+				const slug = subSlug;
 				const content = await fs.readFile(idxPath, "utf-8");
 				const meta = await readMeta(path.join(full, "meta.yml"));
 				const doc = parseDocument(content);
-				const title = meta.title ?? extractTitle(doc) ?? (slug === "index" ? "index" : slug.split("/").pop()!);
+				const title = meta.title ?? extractTitle(doc) ?? slug.split("/").pop()!;
 				index.set(slug, { title, content: doc.body, isPublic: meta.public, updatedAt: meta.updatedAt });
 			}
 		} catch {
@@ -90,12 +71,63 @@ export function removeFromSearchIndex(slug: string): void {
 	index.delete(slug);
 }
 
+// 하위 페이지 slug까지 함께 갱신 (rename 시 사용)
+export function renameSearchIndexPrefix(oldSlug: string, newSlug: string): void {
+	const toRename: Array<{ oldKey: string; newKey: string; entry: IndexEntry }> = [];
+	for (const [slug, entry] of index) {
+		if (slug === oldSlug || slug.startsWith(oldSlug + "/")) {
+			const newKey = slug === oldSlug ? newSlug : newSlug + slug.slice(oldSlug.length);
+			toRename.push({ oldKey: slug, newKey, entry });
+		}
+	}
+	for (const { oldKey, newKey, entry } of toRename) {
+		index.delete(oldKey);
+		index.set(newKey, entry);
+	}
+}
+
+// ── 상속 private 여부 확인 ──
+// 페이지 자체가 private → "private"
+// 상위 문서 중 하나가 private → "inherited_private"
+// 모두 public → "public"
+export function effectiveVisibility(
+	slug: string,
+	isPublic: boolean,
+	pageMap: Map<string, { isPublic: boolean }>,
+): "public" | "private" | "inherited_private" {
+	if (!isPublic) return "private";
+	const parts = slug.split("/");
+	for (let i = 1; i < parts.length; i++) {
+		const ancestorSlug = parts.slice(0, i).join("/");
+		const ancestor = pageMap.get(ancestorSlug);
+		if (ancestor && !ancestor.isPublic) {
+			return "inherited_private";
+		}
+	}
+	return "public";
+}
+
+// ── 페이지 인덱스를 Map으로 반환 (상속 private 확인용) ──
+export function getPageMap(): Map<string, { isPublic: boolean }> {
+	const map = new Map<string, { isPublic: boolean }>();
+	for (const [slug, entry] of index) {
+		map.set(slug, { isPublic: entry.isPublic });
+	}
+	return map;
+}
+
 // ── 검색 ──
 export function searchPages(query: string, includePrivate = false): SearchResult[] {
 	const lower = query.toLowerCase();
+	const pageMap = includePrivate ? null : getPageMap();
 	const results: Array<{ slug: string; path: string; title: string; snippet: string; rank: number }> = [];
 	for (const [slug, entry] of index) {
 		if (!includePrivate && !entry.isPublic) continue;
+		// 비인증 시 상속 private도 제외
+		if (!includePrivate && pageMap) {
+			const vis = effectiveVisibility(slug, entry.isPublic, pageMap);
+			if (vis !== "public") continue;
+		}
 		const titleMatch = entry.title.toLowerCase().includes(lower);
 		const contentLower = entry.content.toLowerCase();
 		const contentMatch = contentLower.includes(lower);
@@ -130,8 +162,14 @@ export type PageSummary = { slug: string; title: string; updatedAt: string; isPu
 
 export function listPagesFromIndex(includePrivate = false): PageSummary[] {
 	const results: PageSummary[] = [];
+	const pageMap = includePrivate ? null : getPageMap();
 	for (const [slug, entry] of index) {
 		if (!includePrivate && !entry.isPublic) continue;
+		// 비인증 시 상속 private도 제외
+		if (!includePrivate && pageMap) {
+			const vis = effectiveVisibility(slug, entry.isPublic, pageMap);
+			if (vis !== "public") continue;
+		}
 		results.push({ slug, title: entry.title, updatedAt: entry.updatedAt, isPublic: entry.isPublic });
 	}
 	return results.sort((a, b) => a.slug.localeCompare(b.slug));

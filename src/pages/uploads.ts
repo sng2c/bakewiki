@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
+import { effectiveVisibility, getPageMap } from "./search.js";
 import { requireAuth } from "../auth/middleware.js";
 import { pageDir } from "../data.js";
 
@@ -103,10 +104,24 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 		return c.json({ files });
 	});
 
-	// Uploads for a specific slug. Public-readable for the attachments section on read pages.
+	// Uploads for a specific slug. 비인증 시 public이고 상속 private가 아닌 페이지만.
 	app.get("/by-slug/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug");
+		const user = c.get("user");
 		const store = c.get("store");
+
+		// 비인증: 페이지가 존재하면 상속 private 검사
+		if (!user) {
+			const pageMap = getPageMap();
+			const pageEntry = pageMap.get(slug);
+			if (pageEntry) {
+				const vis = effectiveVisibility(slug, pageEntry.isPublic, pageMap);
+				if (vis !== "public") {
+					return c.json({ files: [] });
+				}
+			}
+		}
+
 		const files = await listUploadsFor(store.dataDir, slug);
 		return c.json({ files });
 	});

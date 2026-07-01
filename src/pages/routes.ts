@@ -3,9 +3,10 @@ import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
 import { requireAuth } from "../auth/middleware.js";
 import { createPage, updatePage, getPage, deletePage, renamePage, listPages } from "../pages/store.js";
+import { effectiveVisibility, getPageMap } from "../pages/search.js";
 import { parseDocument } from "../pages/frontmatter.js";
 
-// slug에서 부모 경로 추출: "tech/web/HTTP" → "tech/web", "index" → ""
+// slug에서 부모 경로 추출: "tech/web/HTTP" → "tech/web", "home" → ""
 function parentPath(slug: string): string {
 	const idx = slug.lastIndexOf("/");
 	return idx < 0 ? "" : slug.substring(0, idx);
@@ -21,15 +22,26 @@ function validSlug(slug: string | undefined): slug is string {
 export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
 	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
-	// 목록. 미인증: public만 / 인증: 전체.
+	// 목록. 비인증: 효과적 public만 / 인증: 전체 (inheritedPrivate 포함).
 	app.get("/", async (c) => {
 		const user = c.get("user");
 		const store = c.get("store");
 		const list = await listPages(store, !!user);
-		return c.json({ pages: list.map(p => ({ path: parentPath(p.slug), slug: p.slug, title: p.title, public: p.isPublic, updatedAt: p.updatedAt })) });
+		const pageMap = getPageMap();
+		return c.json({ pages: list.map(p => {
+			const vis = effectiveVisibility(p.slug, p.isPublic, pageMap);
+			return {
+				path: parentPath(p.slug),
+				slug: p.slug,
+				title: p.title,
+				public: p.isPublic,
+				inheritedPrivate: vis === "inherited_private" || undefined,
+				updatedAt: p.updatedAt,
+			};
+		}) });
 	});
 
-	// 단일 문서. 비공개 문서는 미인증 → 404.
+	// 단일 문서. 비공개/상속 private 문서는 미인증 → 404.
 	app.get("/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug");
 		if (!validSlug(slug)) {
@@ -40,10 +52,16 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		const page = await getPage(store, slug);
 		if (!page) return c.json({ error: "Not found" }, 404);
 		const user = c.get("user");
-		if (!page.isPublic && !user) {
-			return c.json({ error: "Not found" }, 404);
+		if (!user) {
+			const pageMap = getPageMap();
+			const vis = effectiveVisibility(slug, page.isPublic, pageMap);
+			if (vis !== "public") {
+				return c.json({ error: "Not found" }, 404);
+			}
 		}
-		return c.json({ page: { path: parentPath(page.slug), slug: page.slug, title: page.title, content: page.content, public: page.isPublic, updatedAt: page.updatedAt } });
+		const pageMap = getPageMap();
+		const vis = effectiveVisibility(slug, page.isPublic, pageMap);
+		return c.json({ page: { path: parentPath(page.slug), slug: page.slug, title: page.title, content: page.content, public: page.isPublic, inheritedPrivate: vis === "inherited_private" || undefined, updatedAt: page.updatedAt } });
 	});
 
 	// 생성 또는 수정 (upsert). 관리자 전용.
@@ -66,11 +84,14 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 			? await updatePage(store, slug, content, { title })
 			: await createPage(store, slug, content, { title });
 
+		const pageMap = getPageMap();
+		const vis = effectiveVisibility(saved!.slug, saved!.isPublic, pageMap);
 		return c.json({
 			path: parentPath(saved!.slug),
 			slug: saved!.slug,
 			title: saved!.title,
 			public: saved!.isPublic,
+			inheritedPrivate: vis === "inherited_private" || undefined,
 			updatedAt: saved!.updatedAt,
 		});
 	});
@@ -124,12 +145,16 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 			if (hasPublic) options.isPublic = body.public as boolean;
 			if (hasTitle) options.title = body.title as string;
 			const saved = await updatePage(store, currentSlug, content, options);
-			return c.json({ path: parentPath(saved!.slug), slug: saved!.slug, title: saved!.title, public: saved!.isPublic, updatedAt: saved!.updatedAt });
+			const pageMap = getPageMap();
+			const vis = effectiveVisibility(saved!.slug, saved!.isPublic, pageMap);
+			return c.json({ path: parentPath(saved!.slug), slug: saved!.slug, title: saved!.title, public: saved!.isPublic, inheritedPrivate: vis === "inherited_private" || undefined, updatedAt: saved!.updatedAt });
 		}
 
 		// slug만 변경한 경우
 		const page = await getPage(store, currentSlug);
-		return c.json({ path: parentPath(page!.slug), slug: page!.slug, title: page!.title, public: page!.isPublic, updatedAt: page!.updatedAt });
+		const pageMap = getPageMap();
+		const vis = effectiveVisibility(page!.slug, page!.isPublic, pageMap);
+		return c.json({ path: parentPath(page!.slug), slug: page!.slug, title: page!.title, public: page!.isPublic, inheritedPrivate: vis === "inherited_private" || undefined, updatedAt: page!.updatedAt });
 	});
 
 

@@ -19,7 +19,7 @@ export async function createBackendListener(dataDirArg?: string) {
 	setJwtSecret(config.jwtSecret);
 
 	const auth = await readAuth(dataDir);
-	const store = { dataDir, auth };
+	const store = { dataDir, auth, config };
 
 	await buildSearchIndex(dataDir);
 

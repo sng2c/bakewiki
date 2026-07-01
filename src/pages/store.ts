@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import type { Store } from "../env.js";
 import { pagesDir, pageDir, indexPath, metaPath } from "../data.js";
 import { parseDocument, extractTitle, readMeta, writeMeta } from "./frontmatter.js";
-import { upsertSearchIndex, removeFromSearchIndex } from "./search.js";
+import { upsertSearchIndex, removeFromSearchIndex, renameSearchIndexPrefix } from "./search.js";
 
 // ── 타입 ──
 export type Page = {
@@ -32,7 +32,6 @@ export function generateSlug(): string {
 
 // ── slug에서 타이틀 추출 (디렉토리명, 폴백용) ──
 export function slugToTitle(slug: string): string {
-	if (slug === "index") return "index";
 	const idx = slug.lastIndexOf("/");
 	return idx < 0 ? slug : slug.slice(idx + 1);
 }
@@ -126,13 +125,13 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 	await fs.mkdir(path.dirname(newDir), { recursive: true });
 	await fs.rename(oldDir, newDir);
 
-	// 검색 인덱스 갱신
+	// 검색 인덱스 갱신 (본인 + 하위 페이지 모두)
+	renameSearchIndexPrefix(oldSlug, newSlug);
+
 	const content = await fs.readFile(indexPath(store.dataDir, newSlug), "utf-8");
 	const meta = await readMeta(metaPath(store.dataDir, newSlug));
 	const doc = parseDocument(content);
 	const title = meta.title ?? extractTitle(doc) ?? slugToTitle(newSlug);
-	removeFromSearchIndex(oldSlug);
-	upsertSearchIndex(newSlug, title, doc.body, meta.public, meta.updatedAt);
 
 	return { slug: newSlug, title, content, isPublic: meta.public, updatedAt: meta.updatedAt };
 }

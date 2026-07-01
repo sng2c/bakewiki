@@ -6,7 +6,6 @@ import crypto from "node:crypto";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 // ── 데이터 디렉토리 해석 ──
-// 반드시 CLI --data 플래그 또는 BAKEWIKI_DATA_DIR 환경변수로 지정되어야 함.
 export function resolveDataDir(cliArg?: string): string {
 	const dir = cliArg ?? process.env.BAKEWIKI_DATA_DIR;
 	if (!dir) {
@@ -20,9 +19,7 @@ export function pagesDir(dataDir: string): string {
 	return path.join(dataDir, "pages");
 }
 
-
-// 정적 자산(JS) 디렉토리 해석. tsx(src) 실행과 dist(컴파일) 실행 모두 지원.
-// import.meta.url 위치에서 위로 올라가 public/ 폴더를 찾는다.
+// 정적 자산(JS) 디렉토리 해석.
 export function publicDir(): string {
 	const here = path.dirname(fileURLToPath(import.meta.url));
 	let dir = here;
@@ -31,7 +28,6 @@ export function publicDir(): string {
 		if (fsSync.existsSync(candidate)) return candidate;
 		dir = path.dirname(dir);
 	}
-	// 폴백: dist/public (빌드 산출물 표준 위치)
 	return path.join(here, "..", "public");
 }
 
@@ -44,7 +40,6 @@ export function configPath(dataDir: string): string {
 }
 
 export function pageDir(dataDir: string, slug: string): string {
-	if (slug === "index") return pagesDir(dataDir);
 	return path.join(pagesDir(dataDir), slug);
 }
 
@@ -58,27 +53,17 @@ export function metaPath(dataDir: string, slug: string): string {
 
 export async function initDataDir(dataDir: string): Promise<void> {
 	await fs.mkdir(pagesDir(dataDir), { recursive: true });
-
-	// 홈페이지 기본 파일 생성
-	const homeIndexPath = path.join(pagesDir(dataDir), "index.md");
-	const homeMetaPath = path.join(pagesDir(dataDir), "meta.yml");
-	try { await fs.access(homeIndexPath); } catch {
-		await fs.writeFile(homeIndexPath, "# Welcome to BakeWiki\n", "utf-8");
-	}
-	try { await fs.access(homeMetaPath); } catch {
-		const now = new Date().toISOString();
-		const content = stringifyYaml({ public: true, updatedAt: now, title: "Welcome to BakeWiki" }).trimEnd() + "\n";
-		await fs.writeFile(homeMetaPath, content, "utf-8");
-	}
 }
 
 // ── 설정 (config.yml) ──
 export interface Config {
 	jwtSecret: string;
+	homeSlug: string;
 }
 
 const DEFAULT_CONFIG: Config = {
 	jwtSecret: "",
+	homeSlug: "home",
 };
 
 export async function readConfig(dataDir: string): Promise<Config> {
@@ -88,6 +73,7 @@ export async function readConfig(dataDir: string): Promise<Config> {
 		if (!parsed || typeof parsed !== "object") return { ...DEFAULT_CONFIG, jwtSecret: generateSecret() };
 		return {
 			jwtSecret: typeof parsed.jwtSecret === "string" && parsed.jwtSecret ? parsed.jwtSecret : generateSecret(),
+			homeSlug: typeof parsed.homeSlug === "string" && parsed.homeSlug ? parsed.homeSlug : "home",
 		};
 	} catch {
 		return { ...DEFAULT_CONFIG, jwtSecret: generateSecret() };
@@ -95,11 +81,11 @@ export async function readConfig(dataDir: string): Promise<Config> {
 }
 
 export async function writeConfig(dataDir: string, config: Config): Promise<void> {
-	// 간단한 YAML 직렬화 (키-값 쌍 하나)
 	const lines = [
 		`# bakewiki 설정`,
 		`# 자동 생성됨 — 직접 수정 가능`,
 		`jwtSecret: "${config.jwtSecret}"`,
+		`homeSlug: "${config.homeSlug}"`,
 		``,
 	];
 	await fs.writeFile(configPath(dataDir), lines.join("\n"), "utf-8");

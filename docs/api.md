@@ -2,7 +2,21 @@
 
 All API endpoints are under `/api`. Authentication uses `Authorization: Bearer <api-key>` header or session cookie.
 
-Unauthenticated requests can only access public pages and public search results.
+Unauthenticated requests can only access public pages (including children of public pages). Pages under a private ancestor are not accessible without auth.
+
+## Visibility model
+
+Each page has a `public` flag (`true`/`false`). The **effective visibility** is determined by the page itself AND all ancestors:
+
+| State | Condition |
+|-------|-----------|
+| `public` | Page is public and all ancestors are public |
+| `private` | Page itself is `public: false` |
+| `protected` (inherited private) | Page is `public: true` but an ancestor is private |
+
+Unauthenticated users cannot see, search, list, or access `private` or `protected` pages — including their attachments.
+
+The `inheritedPrivate` field is included in API responses when a page is protected.
 
 ## Pages
 
@@ -16,13 +30,18 @@ Response `200`:
 ```json
 {
   "pages": [
-    { "path": "", "slug": "index", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-    { "path": "docs", "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+    { "path": "", "slug": "home", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+    { "path": "docs", "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" },
+    { "path": "docs", "slug": "docs/public-child", "title": "Child", "public": true, "inheritedPrivate": true, "updatedAt": "2026-06-28T10:00:00.000Z" }
   ]
 }
 ```
 
-`path` is the parent directory (empty string for root-level pages). `slug` is the full identifier (`path + "/" + title_segment`).
+`path` is the parent directory (empty string for root-level pages). `slug` is the full identifier.
+
+`inheritedPrivate` is `true` when the page is public but an ancestor is private (protected). Omitted when not applicable.
+
+Unauthenticated requests only return `public` pages (private and protected are excluded).
 
 ### Get page
 
@@ -35,7 +54,7 @@ Response `200`:
 {
   "page": {
     "path": "",
-    "slug": "index",
+    "slug": "home",
     "title": "Home",
     "content": "# Home\n\nWelcome!",
     "public": true,
@@ -43,13 +62,12 @@ Response `200`:
   }
 }
 ```
-```
 
 | Status | Condition |
 |--------|-----------|
-| `200` | Page found (and accessible) |
+| `200` | Page found and accessible (public, or authed) |
 | `400` | Invalid slug |
-| `404` | Page not found, or private page without auth |
+| `404` | Page not found, or private/protected page without auth |
 
 ### Create or update page
 
@@ -62,7 +80,7 @@ Authorization: Bearer <api-key>
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `content` | string | Yes | Full page body (markdown) |
-| `title` | string | No | Override title (stored in `meta.yml`) |
+| `title` | string | No | Override title |
 
 If `title` is omitted, it is extracted from the first `#` heading in `content`, or derived from the slug.
 
@@ -90,31 +108,9 @@ Authorization: Bearer <api-key>
 | `slug` | string | Rename to a new slug (does not create redirects) |
 | `public` | boolean | Change visibility |
 | `body` | string | Replace page body (markdown content only; metadata preserved) |
-| `title` | string | Override title (stored in `meta.yml`) |
+| `title` | string | Override title |
 
 All fields are optional; include only the ones you want to change.
-
-Examples:
-
-Change visibility:
-```json
-{ "public": false }
-```
-
-Change body:
-```json
-{ "body": "# Updated Title\n\nNew content" }
-```
-
-Rename:
-```json
-{ "slug": "new-slug" }
-```
-
-Combine fields:
-```json
-{ "slug": "new-name", "public": true, "body": "# New Title\n\nContent", "title": "Custom Title" }
-```
 
 Response `200`:
 ```json
@@ -136,6 +132,8 @@ DELETE /api/pages/:slug
 Authorization: Bearer <api-key>
 ```
 
+Deletes the page directory and all contents (including attachments).
+
 | Status | Condition |
 |--------|-----------|
 | `200` | Deleted — `{ "ok": true }` |
@@ -153,13 +151,13 @@ Response `200`:
 ```json
 {
   "results": [
-    { "path": "", "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
+    { "path": "", "slug": "home", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
   ]
 }
 ```
 
 - Returns empty results if `q` is missing.
-- Unauthenticated requests only search public pages.
+- Unauthenticated requests only search public pages (private and protected excluded).
 - Results ranked by title match (higher) then content match.
 
 ## Sitemap
@@ -174,8 +172,8 @@ Response `200`:
   "tree": [
     {
       "path": "",
-      "name": "index",
-      "slug": "index",
+      "name": "home",
+      "slug": "home",
       "title": "Home",
       "public": true,
       "children": [
@@ -204,7 +202,7 @@ Each node in the tree:
 | `public` | boolean\|undefined | Visibility flag (present for pages only) |
 | `children` | array | Child nodes |
 
-Unauthenticated requests only include public pages. Directories without pages still appear as structural nodes (without `slug`/`title`/`public`).
+Unauthenticated requests only include public pages. Private/protected pages and their children are excluded. Directories without pages still appear as structural nodes (without `slug`/`title`/`public`).
 
 ## Health
 
@@ -245,7 +243,6 @@ Response `200`:
 ```
 
 - Files are stored inside the page directory: `data/pages/<slug>/<original>`.
-- Use `@@<original>` in page content to reference uploads (resolved at render time).
 - Empty slug uploads to the temp bucket (`_`).
 - Filename collisions overwrite the existing file.
 
@@ -259,17 +256,19 @@ Response `200`:
 
 ```
 GET /api/upload              — all uploads (auth required)
-GET /api/upload/by-slug/:slug — uploads for a specific page (public)
+GET /api/upload/by-slug/:slug — uploads for a specific page
 ```
 
 Response `200`:
 ```json
 {
   "files": [
-    { "url": "/pages/index/photo.jpg", "filename": "index/photo.jpg", "original": "photo.jpg", "ext": "jpg", "path": "", "slug": "index", "size": 12345 }
+    { "url": "/pages/home/photo.jpg", "filename": "home/photo.jpg", "original": "photo.jpg", "ext": "jpg", "path": "", "slug": "home", "size": 12345 }
   ]
 }
 ```
+
+Unauthenticated requests get an empty file list for private/protected pages.
 
 ### Download file
 
@@ -279,7 +278,7 @@ Files are served at:
 GET /pages/<slug>/<filename>
 ```
 
-Public pages: accessible without auth. Private pages: auth required.
+Public pages: accessible without auth. Private and protected pages: auth required (404 without auth).
 
 ### Delete upload
 
@@ -288,7 +287,7 @@ DELETE /api/upload/:filename
 Authorization: Bearer <api-key>
 ```
 
-`filename` is `<slug>/<original>` (e.g. `index/photo.jpg`).
+`filename` is `<slug>/<original>` (e.g. `home/photo.jpg`).
 
 | Status | Condition |
 |--------|-----------|
@@ -303,5 +302,5 @@ Authorization: Bearer <api-key>
 - No `..` segments
 - Unicode supported (e.g., `히히`, `파일들`)
 - Slugs like `tech/web/HTTP` create a hierarchy
-- The `index` slug is the home page (served at `/`)
+- The home page slug is configurable in Settings (default: `home`), served at `/`
 - Renaming a slug does not create redirects; the old slug returns 404

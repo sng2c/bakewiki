@@ -25,17 +25,17 @@ export class BakewikiClient {
 		return { ok: res.ok, status: res.status, data };
 	}
 
-	async listPages(): Promise<{ path: string; slug: string; title: string; public: boolean; updatedAt: string }[]> {
+	async listPages(): Promise<{ path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string }[]> {
 		const { ok, data } = await this.request("GET", "/api/pages");
 		if (!ok) throw new Error(`Failed to list pages: ${JSON.stringify(data)}`);
-		const pages = (data as { pages: { path: string; slug: string; title: string; public: boolean; updatedAt: string }[] }).pages;
+		const pages = (data as { pages: { path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string }[] }).pages;
 		return pages;
 	}
 
-	async getPage(slug: string): Promise<{ path: string; slug: string; title: string; public: boolean; updatedAt: string; content: string }> {
+	async getPage(slug: string): Promise<{ path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string; content: string }> {
 		const { ok, status, data } = await this.request("GET", `/api/pages/${slug}`);
 		if (!ok) throw new Error(`Page not found: ${slug}`);
-		const page = (data as { page: { path: string; slug: string; title: string; public: boolean; updatedAt: string; content: string } }).page;
+		const page = (data as { page: { path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string; content: string } }).page;
 		return page;
 	}
 
@@ -51,10 +51,10 @@ export class BakewikiClient {
 		return data as { path: string; slug: string; title: string };
 	}
 
-	async patchPage(slug: string, fields: { slug?: string; public?: boolean; body?: string; title?: string }): Promise<{ path: string; slug: string; title: string; public: boolean; updatedAt: string }> {
+	async patchPage(slug: string, fields: { slug?: string; public?: boolean; body?: string; title?: string }): Promise<{ path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string }> {
 		const { ok, status, data } = await this.request("PATCH", `/api/pages/${slug}`, fields);
 		if (!ok) throw new Error(`Failed to patch page: ${JSON.stringify(data)} (status ${status})`);
-		return data as { path: string; slug: string; title: string; public: boolean; updatedAt: string };
+		return data as { path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string };
 	}
 
 	async deletePage(slug: string): Promise<void> {
@@ -204,7 +204,7 @@ export async function remoteCommand(subcommand: string, allArgs: string[], opts:
 				console.log(`path:    ${page.path}`);
 				console.log(`slug:    ${page.slug}`);
 				console.log(`title:   ${page.title}`);
-				console.log(`public:  ${page.public}`);
+				console.log(`public:  ${page.public}${page.inheritedPrivate ? " (protected)" : ""}`);
 				console.log(`updated: ${page.updatedAt.slice(0, 10)}`);
 				console.log("---");
 				console.log(body.trimEnd());
@@ -463,12 +463,13 @@ async function fileCommand(sub: string | undefined, args: string[], opts: Remote
 
 
 // 페이지 목록을 path 트리로 출력.
-function printPageTree(pages: Array<{ path: string; slug: string; title: string; public: boolean; updatedAt: string }>): void {
+function printPageTree(pages: Array<{ path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string }>): void {
 	type TreeNode = {
 		name: string;
 		slug?: string;
 		title?: string;
 		public?: boolean;
+		inheritedPrivate?: boolean;
 		isPage: boolean;
 		children: Map<string, TreeNode>;
 	};
@@ -489,6 +490,7 @@ function printPageTree(pages: Array<{ path: string; slug: string; title: string;
 				child.slug = page.slug;
 				child.title = page.title;
 				child.public = page.public;
+				child.inheritedPrivate = page.inheritedPrivate;
 			}
 			node = child;
 		}
@@ -508,7 +510,7 @@ function printPageTree(pages: Array<{ path: string; slug: string; title: string;
 			const dirPath = prefix ? prefix + "/" + d.name : d.name;
 			const indent = "  ".repeat(depth);
 			if (d.isPage) {
-				const vis = d.public === false ? " 🔒" : "";
+				const vis = d.inheritedPrivate ? " 🛡️" : d.public === false ? " 🔒" : "";
 				console.log(`${indent}${d.title || d.name}${vis}  (${d.slug})`);
 			} else {
 				console.log(`${indent}${d.name}  (${dirPath})`);
@@ -517,7 +519,7 @@ function printPageTree(pages: Array<{ path: string; slug: string; title: string;
 		}
 		for (const p of leafPages) {
 			const indent = "  ".repeat(depth);
-			const vis = p.public === false ? " 🔒" : "";
+			const vis = p.inheritedPrivate ? " 🛡️" : p.public === false ? " 🔒" : "";
 			console.log(`${indent}${p.title || p.name}${vis}  (${p.slug})`);
 		}
 	}

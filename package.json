@@ -1,6 +1,6 @@
 {
   "name": "@sng2c/bakewiki",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "An open-source GFM wiki for humans and LLMs",
   "type": "module",
   "license": "AGPL-3.0-or-later",
@@ -17,9 +17,10 @@
   },
   "files": [
     "dist",
-    "scripts",
+    "public",
+    "README.md",
     "README.ko.md",
-    "public"
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22"
@@ -29,7 +30,8 @@
     "init": "tsx src/cli.ts init --data ./data",
     "serve": "tsx src/cli.ts serve --data ./data",
     "admin:create": "tsx src/cli.ts admin create --data ./data",
-    "build": "tsc && vite build && cp dist/public/page.js dist/public/editor.js public/"
+    "build": "tsc && vite build && cp dist/public/page.js dist/public/editor.js public/",
+    "serve:prod": "node dist/cli.js serve --data ./data"
   },
   "dependencies": {
     "@hono/node-server": "2.0.6",

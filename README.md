@@ -126,11 +126,13 @@ A `.env` file in the project root is auto-loaded. See `.env.example` for referen
 ```
 data/
 ├── pages/              ← page directories (slug = path)
-│   ├── index.md         ← homepage body
-│   ├── meta.yml         ← homepage metadata
+│   ├── home/            ← home page (configurable slug)
+│   │   ├── index.md     ← page body (markdown, no frontmatter)
+│   │   ├── meta.yml     ← {public, updatedAt}
+│   │   └── photo.jpg    ← uploaded file
 │   └── tech/web/HTTP/
 │       ├── index.md     ← page body (markdown, no frontmatter)
-│       ├── meta.yml     ← {public, updatedAt, title?}
+│       ├── meta.yml     ← {public, updatedAt}
 │       └── photo.jpg    ← uploaded file
 ├── auth.json            ← users + tokens
 └── config.yml           ← JWT secret (auto-generated)
@@ -171,7 +173,7 @@ Title resolution: `meta.yml title` → first `#` heading → slug last segment.
 - No `..` segments
 - Unicode supported (e.g., `히히`, `파일들`)
 - Slugs like `tech/web/HTTP` create a hierarchy
-- The `index` slug is the home page (served at `/`)
+- The home page slug is configurable in Settings (default: `home`), served at `/`
 - Renaming a slug does not create redirects; the old slug returns 404
 
 ## API
@@ -182,8 +184,8 @@ Quick reference:
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/pages` | Optional | List pages (public only without auth) |
-| GET | `/api/pages/:slug` | Optional | Get page (404 for private without auth) |
+| GET | `/api/pages` | Optional | List pages (public only without auth; private/protected excluded) |
+| GET | `/api/pages/:slug` | Optional | Get page (404 for private/protected without auth) |
 | POST | `/api/pages/:slug` | Required | Create or update page |
 | PATCH | `/api/pages/:slug` | Required | Partial update (slug, public, body, title) |
 | DELETE | `/api/pages/:slug` | Required | Delete page |

@@ -9,6 +9,7 @@ import { authRoutes } from "./auth/routes.js";
 import { pageRoutes } from "./pages/routes.js";
 import { uploadRoutes } from "./pages/uploads.js";
 import { searchPages } from "./pages/search.js";
+import { effectiveVisibility, getPageMap } from "./pages/search.js";
 import { listPages } from "./pages/store.js";
 import { webReadRoutes } from "./web/read.js";
 import { webAuthRoutes } from "./web/auth.js";
@@ -48,11 +49,29 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 
 	// 첨부 파일 서빙: /pages/{slug}/{filename} 형식의 요청에서
 	// 확장자가 있는 마지막 세그먼트면 파일 서빙 시도, 아니면 next()
+	// 비공개/상속 비공개 페이지의 파일은 인증 필요.
 	app.use("/pages/*", async (c, next) => {
 		const reqPath = c.req.path.slice("/pages/".length);
 		const lastSegment = reqPath.split("/").pop() || "";
 		// 확장자가 있는 요청만 파일 서빙 시도
 		if (lastSegment.includes(".")) {
+			// slug 추출: /pages/tech/web/HTTPS/photo.jpg → tech/web/HTTPS
+			const slug = reqPath.includes("/") ? reqPath.substring(0, reqPath.lastIndexOf("/")) : "";
+			if (slug) {
+				const pageMap = getPageMap();
+				const pageEntry = pageMap.get(slug);
+				if (pageEntry) {
+					const vis = effectiveVisibility(slug, pageEntry.isPublic, pageMap);
+					if (vis !== "public") {
+						const user = c.get("user");
+						if (!user) {
+							return c.json({ error: "Not found" }, 404);
+						}
+					}
+				}
+				// slug가 인덱스에 없으면(빈 폴더 등) 파일 접근 허용
+			}
+
 			const filePath = path.join(pagesDir(store.dataDir), reqPath);
 			try {
 				const stat = await fs.stat(filePath);
@@ -92,12 +111,15 @@ export function createApp(store: Store): Hono<{ Variables: { store: Store; user:
 		return c.json({ results });
 	});
 
-	// sitemap API
+	// sitemap API — 모든 페이지로 트리 빌드 후, 비인증 시 private/protected 가지치기.
 	app.get("/api/sitemap", async (c) => {
 		const user = c.get("user");
 		const store = c.get("store");
-		const list = await listPages(store, !!user);
-		const tree = buildSitemapTree(list);
+		const allPages = await listPages(store, true);
+		let tree = buildSitemapTree(allPages);
+		if (!user) {
+			tree = pruneSitemapPrivate(tree);
+		}
 		return c.json({ tree });
 	});
 
@@ -147,4 +169,21 @@ function buildSitemapTree(pages: Array<{ slug: string; title: string; isPublic: 
 		}
 	}
 	return root;
+}
+
+// 비인증 사용자를 위해 private 노드와 그 하위를 가지치기.
+function pruneSitemapPrivate(nodes: SitemapNode[]): SitemapNode[] {
+	return nodes
+		.filter((n) => {
+			// slug가 있으면 실제 페이지 — private이면 숨김
+			if (n.slug && !n.public) return false;
+			return true;
+		})
+		.map((n) => {
+			const children = pruneSitemapPrivate(n.children);
+			// 빈 중간 노드(페이지가 아니고 자식 없음)도 숨김
+			if (!n.slug && children.length === 0) return null;
+			return { ...n, children };
+		})
+		.filter((n): n is SitemapNode => n !== null);
 }

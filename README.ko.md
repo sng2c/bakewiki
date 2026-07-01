@@ -126,11 +126,13 @@ bakewiki llm help                     # → JSON 도움말 스키마
 ```
 data/
 ├── pages/              ← 페이지 디렉토리 (슬러그 = 경로)
-│   ├── index.md         ← 홈페이지 본문
-│   ├── meta.yml         ← 홈페이지 메타데이터
+│   ├── home/            ← 홈페이지 (설정에서 변경 가능)
+│   │   ├── index.md     ← 페이지 본문 (순수 마크다운, frontmatter 없음)
+│   │   ├── meta.yml     ← {public, updatedAt}
+│   │   └── photo.jpg    ← 업로드된 파일
 │   └── tech/web/HTTP/
 │       ├── index.md     ← 페이지 본문 (순수 마크다운, frontmatter 없음)
-│       ├── meta.yml     ← {public, updatedAt, title?}
+│       ├── meta.yml     ← {public, updatedAt}
 │       └── photo.jpg    ← 업로드된 파일
 ├── auth.json            ← 사용자 + 토큰
 └── config.yml           ← JWT 시크릿 (자동 생성)
@@ -171,7 +173,7 @@ data/
 - `..` 세그먼트 금지
 - 유니코드 지원 (예: `히히`, `파일들`)
 - `tech/web/HTTP` 형태의 계층 슬러그
-- `index` 슬러그는 홈페이지 (`/`에서 서빙)
+- 홈페이지 슬러그는 Settings에서 설정 가능 (기본값 `home`), `/`에서 서빙
 - 슬러그 변경 시 기존 URL은 404 (리다이렉트 없음)
 
 ## API
