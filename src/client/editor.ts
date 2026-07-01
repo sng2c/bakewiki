@@ -190,15 +190,15 @@ if (import.meta.hot) {
 
 		var insertBtn = document.createElement('button');
 		insertBtn.type = 'button';
-		insertBtn.innerHTML = '<i data-lucide="plus-circle" style="width:1rem;height:1rem;vertical-align:-2px"></i>';
-		insertBtn.className = 'secondary';
-		insertBtn.style.cssText = 'font-size:0.8rem;padding:0.2rem 0.6rem;margin:0';
+		insertBtn.innerHTML = '<i data-lucide="plus-circle" style="width:1rem;height:1rem"></i>';
+		insertBtn.title = 'Insert';
+		insertBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;color:var(--pico-primary)';
 
 		var delBtn = document.createElement('button');
 		delBtn.type = 'button';
-		delBtn.innerHTML = '<i data-lucide="trash-2" style="width:1rem;height:1rem;vertical-align:-2px"></i>';
-		delBtn.className = 'secondary';
-		delBtn.style.cssText = 'font-size:0.8rem;padding:0.2rem 0.6rem;margin:0;color:#c0392b';
+		delBtn.innerHTML = '<i data-lucide="trash-2" style="width:1rem;height:1rem"></i>';
+		delBtn.title = 'Delete';
+		delBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;color:#c0392b';
 		delBtn.addEventListener('click', async function () {
 			if (!confirm('Delete this file? ' + item.original)) return;
 			var ok = await deleteImage(item.filename);
@@ -208,8 +208,8 @@ if (import.meta.hot) {
 		function doInsert() {
 			// 삽입: 같은 디렉토리의 상대 경로
 			var insertUrl = item.original;
-			var md = isImage ? '\n![](' + insertUrl + ')\n' : '\n[' + item.original + '](' + insertUrl + ')\n';
-			insertAtCursor(md);
+			var mdText = isImage ? '\n![](' + insertUrl + ')\n' : '\n[' + item.original + '](' + insertUrl + ')\n';
+			insertAtCursor(mdText);
 		}
 		preview.addEventListener('click', doInsert);
 		insertBtn.addEventListener('click', doInsert);
