@@ -267,4 +267,5 @@ if (import.meta.hot) {
 				}
 			}).catch(function () {});
 		}
+	}
 })();
