@@ -49,7 +49,7 @@ textarea[name="content"] { min-height: 320px; font-family: monospace; }
 article { padding: 1rem; margin-top: 1rem; }
 article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
-article blockquote { margin: 0; padding: 0.4rem; font-size: 0.85rem; line-height: 1.3; }
+
 .page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
 .page-header nav[aria-label="breadcrumb"] { margin:0; padding:0; }
 .page-header nav[aria-label="breadcrumb"] ul { margin:0; padding:0; display:flex; flex-wrap:wrap; align-items:center; gap:0; font-size:0.8rem; list-style:none; }
