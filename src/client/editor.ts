@@ -10,6 +10,7 @@ if (import.meta.hot) {
 (function () {
 	var md = window.markdownit({
 		html: true,
+		breaks: true,
 		linkify: true,
 		typographer: false,
 		highlight: function (str, lang) {
