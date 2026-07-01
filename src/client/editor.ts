@@ -170,7 +170,7 @@ if (import.meta.hot) {
 		var preview;
 		if (isImage) {
 			preview = document.createElement('span');
-			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-card-border-color);overflow:hidden;flex-shrink:0';
+			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-color);overflow:hidden;flex-shrink:0';
 			var img = document.createElement('img');
 			img.src = item.url;
 			img.alt = '';
@@ -178,7 +178,7 @@ if (import.meta.hot) {
 			preview.appendChild(img);
 		} else {
 			preview = document.createElement('span');
-			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-card-border-color);flex-shrink:0';
+			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-color);flex-shrink:0';
 			var fileIcon = document.createElement('i');
 			fileIcon.setAttribute('data-lucide', 'file');
 			fileIcon.style.cssText = 'width:24px;height:24px;color:var(--pico-muted-color,#999)';
