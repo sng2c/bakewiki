@@ -50,6 +50,7 @@ article { padding: 1rem; margin-top: 1rem; }
 article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
 article blockquote { margin: 0 0 0.5rem 0; padding: 0.5rem 1rem; }
+article p:last-child { margin-bottom: 0; }
 
 .page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
 .page-header nav[aria-label="breadcrumb"] { margin:0; padding:0; }
