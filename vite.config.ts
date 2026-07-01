@@ -41,7 +41,11 @@ function bakewikiBackend(): Plugin {
 							if (m) server.moduleGraph.invalidateModule(m);
 						}
 						loadBackend()
-							.then(() => console.log(`  [bakewiki] backend reloaded ✓`))
+							.then(() => {
+								console.log(`  [bakewiki] backend reloaded ✓");
+								// 브라우저에 풀페이지 리로드 신호 전송
+								server.ws.send({ type: "full-reload" });
+							})
 							.catch((e) => console.error("  [bakewiki] reload error:", e));
 					}, 100);
 				}
