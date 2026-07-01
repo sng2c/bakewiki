@@ -6,31 +6,32 @@ import { searchPages } from "../pages/search.js";
 import { parseDocument, extractTitle } from "../pages/frontmatter.js";
 import { renderTemplate } from "../render/hbs.js";
 
-type FlatItem = {
-	isDir: boolean;
+type TreeNode = {
 	name: string;
 	slug?: string;
 	title?: string;
 	isPublic?: boolean;
-	depth: number;
-	dirPath?: string; // 디렉토리 전체 경로 (클릭용)
+	isPage: boolean;       // 실제 index.md 존재 여부
+	isEmpty: boolean;      // index.md 없는 폴더 (빈 페이지)
+	isDir: boolean;
+	dirPath?: string;
+	children: TreeNode[];
 };
 
-// 페이지 목록을 디렉토리 트리로 그룹화하여 평탄화.
-// 디렉토리 노드와 페이지 노드가 depth 정보와 함께 반환됨.
-function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>): FlatItem[] {
-	type TreeNode = {
+type FlatItem = TreeNode;
+
+function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boolean }>): TreeNode[] {
+	type RawNode = {
 		name: string;
 		slug?: string;
 		title?: string;
 		isPublic?: boolean;
 		isPage: boolean;
-		children: Map<string, TreeNode>;
+		children: Map<string, RawNode>;
 	};
 
-	const root: TreeNode = { name: "", isPage: false, children: new Map() };
+	const root: RawNode = { name: "", isPage: false, children: new Map() };
 
-	// 페이지를 트리에 삽입
 	for (const page of pages) {
 		const segments = page.slug.split("/");
 		let node = root;
@@ -55,52 +56,43 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 		}
 	}
 
-	// 트리를 평탄화 (디렉토리 먼저, 그 다음 페이지)
-	const items: FlatItem[] = [];
-	function flatten(n: TreeNode, depth: number, prefix: string) {
-		const dirs: TreeNode[] = [];
-		const pages: TreeNode[] = [];
+	// RawNode(재귀 Map)를 정렬된 트리 배열(TreeNode)로 변환.
+	// 디렉토리(자식 있음) 먼저, 그 다음 페이지(자식 없음).
+	function toTree(n: RawNode, dirPath: string): TreeNode {
+		const dirs: RawNode[] = [];
+		const leaves: RawNode[] = [];
 		for (const child of n.children.values()) {
-			if (child.isPage && child.children.size > 0) {
-				// 페이지이면서 자식이 있는 경우: 디렉토리로도 표시
-				dirs.push(child);
-			} else if (child.children.size > 0) {
-				dirs.push(child);
-			} else {
-				pages.push(child);
-			}
+			if (child.children.size > 0) dirs.push(child);
+			else leaves.push(child);
 		}
-		// 디렉토리를 이름순으로 정렬
 		dirs.sort((a, b) => a.name.localeCompare(b.name));
-		pages.sort((a, b) => a.name.localeCompare(b.name));
-		// 디렉토리 먼저 출력
-		for (const d of dirs) {
-			const dirPath = prefix ? prefix + "/" + d.name : d.name;
-			if (d.isPage) {
-				// 페이지이면서 디렉토리인 경우: 페이지로 표시 + 자식은 하위에
-				items.push({ isDir: false, name: d.name, slug: d.slug, title: d.title, isPublic: d.isPublic, depth });
-				flatten(d, depth + 1, dirPath);
-			} else {
-				items.push({ isDir: true, name: d.name, depth, dirPath });
-				flatten(d, depth + 1, dirPath);
-			}
-		}
-		// 그 다음 일반 페이지
-		for (const p of pages) {
-			items.push({ isDir: false, name: p.name, slug: p.slug, title: p.title, isPublic: p.isPublic, depth });
-		}
+		leaves.sort((a, b) => a.name.localeCompare(b.name));
+		const sorted = dirs.concat(leaves);
+		return {
+			name: n.name,
+			slug: n.slug,
+			title: n.title,
+			isPublic: n.isPage ? n.isPublic : undefined,  // 빈 폴더는 public/private 구분 없음
+			isPage: n.isPage,
+			isEmpty: !n.isPage,                           // index.md 없으면 빈 페이지
+			isDir: n.children.size > 0 && !n.isPage,
+			dirPath: dirPath || undefined,
+			children: sorted.map((c) => {
+				const childPath = dirPath ? dirPath + "/" + c.name : c.name;
+				return toTree(c, childPath);
+			}),
+		};
 	}
-	flatten(root, 0, "");
-	return items;
+
+	return toTree(root, "").children;
 }
 
 // 슬러그에서 breadcrumb 항목 생성.
-// 마지막 세그먼트는 title로 표시, 나머지는 slug 세그먼트.
-// tech/web/HTTP + title="HTTP" → [🏠, tech, web, HTTP(current)]
-// index 세그먼트는 🏠 아이콘으로 표시.
 function buildBreadcrumb(slug: string, title: string) {
 	const segments = slug.split("/");
 	const items: Array<{ name: string; href?: string; current?: boolean }> = [];
+	// 홈 표시
+	items.push({ name: "Home", href: "/" });
 	let acc = "";
 	for (let i = 0; i < segments.length; i++) {
 		acc = acc ? `${acc}/${segments[i]}` : segments[i];
@@ -121,17 +113,16 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 	if (!page) return null;
 	if (!page.isPublic && !authed) return null;
 	const doc = parseDocument(page.content);
-	const extractedTitle = extractTitle(doc) ?? "";
-	const title = extractedTitle;
+	const title = page.title;
 	const breadcrumb = buildBreadcrumb(slug, title);
 	const view = {
 		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
 		breadcrumb,
-		body: doc.body,
+		body: `# ${title}\n\n${doc.body}`,
 		title,
 		slug,
 		user: authed,
-		pageData: JSON.stringify({ title, slug, body: doc.body }),
+		pageData: JSON.stringify({ title, slug, isPublic: page.isPublic, body: `# ${title}\n\n${doc.body}` }),
 	};
 	return renderTemplate("page", view, { title: title || page.slug, user: authed, q: "", needsPageRender: true });
 }
@@ -148,12 +139,26 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		return c.html(renderTemplate("notFound", { slug: "index", canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
 	});
 
-	// 전체 목록 (/pages) — 디렉토리별 그룹 트리
+	// 전체 목록 (/pages)
 	app.get("/pages", async (c) => {
 		const user = c.get("user");
 		const store = c.get("store");
 		const pages = await listPages(store, !!user);
-		const items = buildPageTree(pages);
+		// index(홈)를 트리 최상단에, 나머지는 하위 트리로.
+		const indexPage = pages.find((p) => p.slug === "index");
+		const others = pages.filter((p) => p.slug !== "index");
+		const childTree = buildPageTree(others);
+		const items: TreeNode[] = [{
+			name: indexPage?.title || "Home",
+			slug: indexPage?.slug,
+			title: indexPage?.title,
+			isPublic: indexPage?.isPublic ?? true,
+			isPage: true,
+			isEmpty: false,
+			isDir: false,
+			dirPath: undefined,
+			children: childTree,
+		}];
 		const html = renderTemplate("list", { items }, { title: "All pages", user: !!user, q: "" });
 		return c.html(html);
 	});
@@ -167,7 +172,7 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		return c.html(html);
 	});
 
-	// 문서 조회 (/pages/:slug{.+}). 리다이렉트 → 301, 없으면 notFound.
+	// 문서 조회 (/pages/:slug{.+})
 	app.get("/pages/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug")!;
 		const user = c.get("user");
@@ -175,7 +180,10 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 
 		const html = await renderPage(store, slug, !!user);
 		if (html) return c.html(html);
-		return c.html(renderTemplate("notFound", { slug, canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
+		// 없는 페이지: slug의 마지막 세그먼트를 제목으로. 404가 아닌 200 + 빈 페이지 템플릿.
+		const segs = slug.split("/");
+		const title = segs[segs.length - 1];
+		return c.html(renderTemplate("notFound", { slug, title, canCreate: !!user }, { title: `${title} - bakewiki`, user: !!user, q: "", needsPageRender: false }));
 	});
 
 	return app;

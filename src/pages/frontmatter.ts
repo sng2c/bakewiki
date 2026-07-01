@@ -1,6 +1,13 @@
+import fs from "node:fs/promises";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 export type Frontmatter = Record<string, unknown>;
+
+export type MetaData = {
+	public: boolean;
+	updatedAt: string;
+	title?: string;
+};
 
 export type ParsedDocument = {
 	frontmatter: Frontmatter | null;
@@ -24,7 +31,7 @@ export function parseDocument(raw: string): ParsedDocument {
 	return { frontmatter, body };
 }
 
-// title 추출: 첫 # 헤딩만 사용. frontmatter.title은 무시.
+// title 추출: 첫 # 헤딩만 사용. 폴백용.
 export function extractTitle(doc: ParsedDocument): string | null {
 	const heading = doc.body.match(/^#\s+(.+)$/m);
 	if (heading) return heading[1].trim();
@@ -38,15 +45,28 @@ export function ensureHeading(body: string, title: string): string {
 	return `# ${title}\n\n${body}`;
 }
 
-// public 추출: frontmatter.public (boolean, 기본 true)
-export function extractPublic(doc: ParsedDocument): boolean {
-	const p = doc.frontmatter?.public;
-	if (typeof p === "boolean") return p;
-	return true;
+// meta.yml 읽기. 파일이 없거나 파싱 실패 시 기본값 반환.
+export async function readMeta(metaFilePath: string): Promise<MetaData> {
+	try {
+		const content = await fs.readFile(metaFilePath, "utf-8");
+		const parsed = parseYaml(content);
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+			return { public: true, updatedAt: new Date().toISOString() };
+		}
+		return {
+			public: typeof parsed.public === "boolean" ? parsed.public : true,
+			updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+			title: typeof parsed.title === "string" ? parsed.title : undefined,
+		};
+	} catch {
+		return { public: true, updatedAt: new Date().toISOString() };
+	}
 }
 
-// public + body → GFM 문서 조립. frontmatter에는 public만 포함.
-export function buildDocument(isPublic: boolean, body: string): string {
-	const fm = stringifyYaml({ public: isPublic }).trimEnd();
-	return `---\n${fm}\n---\n${body}`;
+// meta.yml 쓰기.
+export async function writeMeta(metaFilePath: string, meta: MetaData): Promise<void> {
+	const data: Record<string, unknown> = { public: meta.public, updatedAt: meta.updatedAt };
+	if (meta.title !== undefined) data.title = meta.title;
+	const content = stringifyYaml(data).trimEnd() + "\n";
+	await fs.writeFile(metaFilePath, content, "utf-8");
 }

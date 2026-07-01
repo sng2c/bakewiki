@@ -24,11 +24,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "tsx --watch src/cli.ts serve --data ./data",
+    "dev": "vite",
     "init": "tsx src/cli.ts init --data ./data",
     "serve": "tsx src/cli.ts serve --data ./data",
     "admin:create": "tsx src/cli.ts admin create --data ./data",
-    "build": "tsc && node scripts/copy-public.mjs"
+    "build": "tsc && vite build"
   },
   "dependencies": {
     "@hono/node-server": "2.0.6",
@@ -41,9 +41,12 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/bcrypt": "6.0.0",
     "@types/node": "26.0.1",
+    "playwright": "^1.61.1",
     "tsx": "4.22.4",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vite": "^8.1.2"
   }
 }

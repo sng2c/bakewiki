@@ -6,6 +6,7 @@ import { adminCreateCommand } from "./cli/admin.js";
 import { importCommand } from "./cli/import.js";
 import { exportCommand } from "./cli/export.js";
 import { remoteCommand, extractRemoteOpts } from "./cli/pages.js";
+import { llmCommand } from "./cli/llm.js";
 
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -32,6 +33,7 @@ Commands:
   import <dir>      Import markdown folder into wiki
   export <dir>      Export wiki to markdown folder
   remote <cmd>      Remote page operations
+  llm <cmd>         Same as remote but JSON output (LLM-friendly)
 
 Serve options:
   --host <addr>     Bind address (default: 127.0.0.1, env: BAKEWIKI_HOST)
@@ -51,6 +53,10 @@ Remote commands:
 Remote options (before or after subcommand):
   --url <url>     Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
   --key <apikey>  API key (or set BAKEWIKI_API_KEY)
+
+LLM commands:
+  Same subcommands as remote (list, get, create, rename, patch, delete,
+  search, sitemap, health, file). Output is always JSON on stdout.
 `);
 }
 
@@ -137,6 +143,16 @@ async function main(): Promise<void> {
 				process.exit(1);
 			}
 			await remoteCommand(sub, remoteRest.slice(1), remoteOpts);
+			break;
+		}
+		case "llm": {
+			const { opts: llmOpts, rest: llmRest } = extractRemoteOpts(rest);
+			const lsub = llmRest[0];
+			if (!lsub) {
+				console.error("Usage: bakewiki llm [options] <list|get|create|rename|patch|delete|search|sitemap|health|file>");
+				process.exit(1);
+			}
+			await llmCommand(lsub, llmRest.slice(1), llmOpts);
 			break;
 		}
 		case "version":

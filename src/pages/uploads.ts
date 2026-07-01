@@ -4,42 +4,39 @@ import fs from "node:fs/promises";
 import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
 import { requireAuth } from "../auth/middleware.js";
-import { uploadsDir } from "../data.js";
+import { pageDir } from "../data.js";
 
-// Upload domain. Directory-based storage: one folder per slug.
-// File: uploads/<slug>/<original-filename>
-//   - slug "tech/web/http" → uploads/tech/web/http/photo.jpg (nested dirs mirror page hierarchy)
-//   - original filename preserved (collision = overwrite within same slug)
+// Upload domain. Files are stored inside the page directory.
+// File: pages/<slug>/<original-filename>
+//   - slug "tech/web/http" → pages/tech/web/http/photo.jpg
+//   - original filename preserved (collision = overwrite within same page)
 //   - new page (no slug yet) → uploads/_/<original> (shared temp bucket, moved on save)
-// /uploads/* served publicly by serveStatic in app.ts.
-// Content uses @@<original> marker, resolved to /uploads/<slug>/<original> at render time.
+// API endpoints remain /api/upload/* for backward compatibility.
+// File serving is via /pages/<slug>/<filename> URL pattern (handled in app.ts).
 
 const TEMP_BUCKET = "_";
 
-// Slug → directory path relative to uploads root. Empty slug → temp bucket.
+// 예약 파일명 (페이지 메타데이터)
+const RESERVED_FILES = new Set(["index.md", "meta.yml"]);
+
+// Slug → path relative to uploads root. Empty slug → temp bucket.
 export function slugToUploadDir(slug: string): string {
 	if (!slug) return TEMP_BUCKET;
 	return slug.replace(/^\/+|\/+$/g, "");
 }
 
-// Reverse: directory path → slug. Temp bucket → "".
+// Reverse: path → slug. Temp bucket → "".
 export function dirToSlug(dir: string): string {
 	if (dir === TEMP_BUCKET) return "";
 	return dir;
 }
 
-// Validate a slug for use as a directory path: forbid "..", "\", leading/trailing "/".
-function isValidSlugDir(slugDir: string | undefined): slugDir is string {
-	if (!slugDir) return false;
-	if (slugDir.includes("..") || slugDir.includes("\\")) return false;
-	if (slugDir.startsWith("/") || slugDir.endsWith("/")) return false;
+// Validate an original filename: no path separators, no "..", must have extension, not reserved.
+function isValidOriginal(name: string): boolean {
+	if (!name || name.includes("/") || name.includes("\\") || name.includes("..")) return false;
+	if (RESERVED_FILES.has(name)) return false;
+	if (!name.includes(".") || name.indexOf(".") === 0) return false;
 	return true;
-}
-
-// Extract extension from a filename (lowercase), or "" if none.
-function extractExt(filename: string): string {
-	const m = filename.match(/\.([a-z0-9]+)$/i);
-	return m ? m[1].toLowerCase() : "";
 }
 
 // Sanitize an original filename: strip directory components, forbid traversal.
@@ -48,11 +45,10 @@ function sanitizeOriginal(name: string): string {
 	return base.replace(/[\\/]+/g, "");
 }
 
-// Validate an original filename: no path separators, no "..", must have extension.
-function isValidOriginal(name: string): boolean {
-	if (!name || name.includes("/") || name.includes("\\") || name.includes("..")) return false;
-	if (!name.includes(".") || name.indexOf(".") === 0) return false;
-	return true;
+// Extract extension from a filename (lowercase), or "" if none.
+function extractExt(filename: string): string {
+	const m = filename.match(/\.([a-z0-9]+)$/i);
+	return m ? m[1].toLowerCase() : "";
 }
 
 export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
@@ -77,9 +73,11 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 			return c.json({ error: "Filename must have a name and extension" }, 400);
 		}
 
-		const slugDir = slugToUploadDir(slug);
 		const store = c.get("store");
-		const dir = path.join(uploadsDir(store.dataDir), slugDir);
+		const dir = slug
+			? pageDir(store.dataDir, slug)
+			: path.join(store.dataDir, "uploads", TEMP_BUCKET);
+
 		await fs.mkdir(dir, { recursive: true });
 		const fullPath = path.join(dir, original);
 
@@ -87,7 +85,8 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 		await fs.writeFile(fullPath, buf); // overwrite on collision
 
 		const ext = extractExt(original);
-		const url = `/uploads/${slugDir}/${original}`;
+		const slugDir = slugToUploadDir(slug);
+		const url = slug ? `/pages/${slug}/${original}` : `/uploads/${TEMP_BUCKET}/${original}`;
 		return c.json({ url, filename: `${slugDir}/${original}`, original, ext, slug, size: file.size });
 	});
 
@@ -116,11 +115,15 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 		}
 		const slugDir = filename!.slice(0, lastSlash);
 		const original = filename!.slice(lastSlash + 1);
-		if (!isValidSlugDir(slugDir) || !isValidOriginal(original)) {
+		if (!slugDir || !isValidOriginal(original)) {
 			return c.json({ error: "Invalid filename" }, 400);
 		}
 		const store = c.get("store");
-		const fullPath = path.join(uploadsDir(store.dataDir), slugDir, original);
+		// 파일은 페이지 디렉토리 내에 있음
+		const dir = slugDir === TEMP_BUCKET
+			? path.join(store.dataDir, "uploads", TEMP_BUCKET)
+			: pageDir(store.dataDir, slugDir);
+		const fullPath = path.join(dir, original);
 		try {
 			await fs.unlink(fullPath);
 		} catch {
@@ -135,7 +138,7 @@ export function uploadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser
 // Build the full file URL from slug + original.
 export function buildUploadUrl(slug: string, original: string): string {
 	const slugDir = slugToUploadDir(slug);
-	return `/uploads/${slugDir}/${original}`;
+	return `/pages/${slugDir}/${original}`;
 }
 
 // List uploads, optionally filtered by slug.
@@ -143,13 +146,11 @@ async function listUploadsFor(
 	dataDir: string,
 	slug: string | undefined,
 ): Promise<Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }>> {
-	const uploadsRoot = uploadsDir(dataDir);
 	const files: Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }> = [];
 
 	if (slug !== undefined) {
-		// List files in a specific slug's directory
-		const slugDir = slugToUploadDir(slug);
-		const dir = path.join(uploadsRoot, slugDir);
+		// List files in a specific page's directory
+		const dir = pageDir(dataDir, slug);
 		let entries: string[];
 		try {
 			entries = await fs.readdir(dir);
@@ -157,12 +158,13 @@ async function listUploadsFor(
 			return [];
 		}
 		for (const name of entries) {
+			if (RESERVED_FILES.has(name)) continue;
 			if (!isValidOriginal(name)) continue;
 			try {
 				const stat = await fs.stat(path.join(dir, name));
 				files.push({
-					url: `/uploads/${slugDir}/${name}`,
-					filename: `${slugDir}/${name}`,
+					url: `/pages/${slug}/${name}`,
+					filename: `${slug}/${name}`,
 					original: name,
 					ext: extractExt(name),
 					slug,
@@ -173,35 +175,84 @@ async function listUploadsFor(
 			}
 		}
 	} else {
-		// List all: walk subdirectories
-		let topEntries: import("node:fs").Dirent[];
+		// List all: walk page directories
+		const pagesRoot = pagesDir(dataDir);
+		await walkForUploads(pagesRoot, pagesRoot, files);
+
+		// Also list temp bucket
+		const tempDir = path.join(dataDir, "uploads", TEMP_BUCKET);
+		let tempEntries: string[];
 		try {
-			topEntries = await fs.readdir(uploadsRoot, { withFileTypes: true });
+			tempEntries = await fs.readdir(tempDir);
 		} catch {
-			return [];
+			tempEntries = [];
 		}
-		for (const entry of topEntries) {
-			if (!entry.isDirectory()) continue;
-			const slugDir = entry.name;
-			if (!isValidSlugDir(slugDir)) continue;
-			const decodedSlug = dirToSlug(slugDir);
-			const dir = path.join(uploadsRoot, slugDir);
-			let entries: string[];
+		for (const name of tempEntries) {
+			if (RESERVED_FILES.has(name)) continue;
+			if (!isValidOriginal(name)) continue;
 			try {
-				entries = await fs.readdir(dir);
+				const stat = await fs.stat(path.join(tempDir, name));
+				files.push({
+					url: `/uploads/${TEMP_BUCKET}/${name}`,
+					filename: `${TEMP_BUCKET}/${name}`,
+					original: name,
+					ext: extractExt(name),
+					slug: "",
+					size: stat.size,
+				});
 			} catch {
-				continue;
+				// skip
 			}
-			for (const name of entries) {
+		}
+	}
+	files.sort((a, b) => b.filename.localeCompare(a.filename));
+	return files;
+}
+
+// 페이지 디렉토리를 순회하며 첨부 파일(예약 파일 제외)을 수집.
+async function walkForUploads(
+	pagesRoot: string,
+	dir: string,
+	files: Array<{ url: string; filename: string; original: string; ext: string; slug: string; size: number }>,
+): Promise<void> {
+	let entries: import("node:fs").Dirent[];
+	try {
+		entries = await fs.readdir(dir, { withFileTypes: true });
+	} catch {
+		return;
+	}
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		const full = path.join(dir, entry.name);
+		const idxPath = path.join(full, "index.md");
+		let isPage = false;
+		try {
+			const stat = await fs.stat(idxPath);
+			isPage = stat.isFile();
+		} catch {
+			// index.md 없음 — 페이지 아님
+		}
+
+		if (isPage) {
+			const slug = path.relative(pagesRoot, full).replace(/\\/g, "/");
+			// 이 페이지의 첨부 파일 수집
+			let pageEntries: string[];
+			try {
+				pageEntries = await fs.readdir(full);
+			} catch {
+				pageEntries = [];
+			}
+			for (const name of pageEntries) {
+				if (RESERVED_FILES.has(name)) continue;
 				if (!isValidOriginal(name)) continue;
 				try {
-					const stat = await fs.stat(path.join(dir, name));
+					const stat = await fs.stat(path.join(full, name));
 					files.push({
-						url: `/uploads/${slugDir}/${name}`,
-						filename: `${slugDir}/${name}`,
+						url: `/pages/${slug}/${name}`,
+						filename: `${slug}/${name}`,
 						original: name,
 						ext: extractExt(name),
-						slug: decodedSlug,
+						slug,
 						size: stat.size,
 					});
 				} catch {
@@ -209,7 +260,11 @@ async function listUploadsFor(
 				}
 			}
 		}
+
+		// 하위 디렉토리도 순회
+		await walkForUploads(pagesRoot, full, files);
 	}
-	files.sort((a, b) => b.filename.localeCompare(a.filename));
-	return files;
 }
+
+// pagesDir 임포트 (walkForUploads에서 사용)
+import { pagesDir } from "../data.js";

@@ -3,7 +3,7 @@ import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
 import { requireAuth } from "../auth/middleware.js";
 import { createPage, updatePage, getPage, deletePage, renamePage, listPages } from "../pages/store.js";
-import { parseDocument, extractPublic, buildDocument } from "../pages/frontmatter.js";
+import { parseDocument } from "../pages/frontmatter.js";
 
 // slug 검증: 빈 문자열, "..", 선행/후행 "/" 금지
 function validSlug(slug: string | undefined): slug is string {
@@ -20,10 +20,10 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		const user = c.get("user");
 		const store = c.get("store");
 		const list = await listPages(store, !!user);
-		return c.json({ pages: list });
+		return c.json({ pages: list.map(p => ({ slug: p.slug, title: p.title, public: p.isPublic, updatedAt: p.updatedAt })) });
 	});
 
-	// 단일 문서. 리다이렉트 우선 확인, 비공개 문서는 미인증 → 404.
+	// 단일 문서. 비공개 문서는 미인증 → 404.
 	app.get("/:slug{.+}", async (c) => {
 		const slug = c.req.param("slug");
 		if (!validSlug(slug)) {
@@ -37,7 +37,7 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		if (!page.isPublic && !user) {
 			return c.json({ error: "Not found" }, 404);
 		}
-		return c.json({ page });
+		return c.json({ page: { slug: page.slug, title: page.title, content: page.content, public: page.isPublic, updatedAt: page.updatedAt } });
 	});
 
 	// 생성 또는 수정 (upsert). 관리자 전용.
@@ -49,6 +49,7 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 
 		const body = await c.req.json().catch(() => null);
 		const content = body?.content;
+		const title = typeof body?.title === "string" ? body.title : undefined;
 		if (typeof content !== "string") {
 			return c.json({ error: "content (string) is required" }, 400);
 		}
@@ -56,8 +57,8 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		const store = c.get("store");
 		const existing = await getPage(store, slug);
 		const saved = existing
-			? await updatePage(store, slug, content)
-			: await createPage(store, slug, content);
+			? await updatePage(store, slug, content, { title })
+			: await createPage(store, slug, content, { title });
 
 		return c.json({
 			slug: saved!.slug,
@@ -70,7 +71,7 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 	// 부분 업데이트 (PATCH). 관리자 전용.
 	// { "slug": "new-slug" } → 이름 변경
 	// { "public": true/false } → 공개여부 변경
-	// { "body": "..." } → 본문 변경 (헤딩 유지/추가)
+	// { "body": "..." } → 본문 변경
 	// { "public": false, "body": "..." } → 복합 변경
 	// { "slug": "new", "public": true } → 이름 변경 + 공개여부 변경
 	app.patch("/:slug{.+}", requireAuth, async (c) => {
@@ -88,9 +89,10 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		const hasSlugChange = typeof body.slug === "string" && body.slug !== oldSlug;
 		const hasPublic = typeof body.public === "boolean";
 		const hasBody = typeof body.body === "string";
+		const hasTitle = typeof body.title === "string";
 
 		// 변경할 것이 없으면 400
-		if (!hasSlugChange && !hasPublic && !hasBody) {
+		if (!hasSlugChange && !hasPublic && !hasBody && !hasTitle) {
 			return c.json({ error: "No fields to update. Provide slug, public, or body." }, 400);
 		}
 
@@ -106,15 +108,15 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 			currentSlug = newSlug;
 		}
 
-		// public 또는 body 변경이 있으면 콘텐츠 업데이트
-		if (hasPublic || hasBody) {
+		// public, title 또는 body 변경이 있으면 콘텐츠/메타 업데이트
+		if (hasPublic || hasBody || hasTitle) {
 			const page = await getPage(store, currentSlug);
 			if (!page) return c.json({ error: "Not found" }, 404);
-			const doc = parseDocument(page.content);
-			const isPublic = hasPublic ? body.public as boolean : extractPublic(doc);
-			const newBody = hasBody ? body.body as string : doc.body;
-			const content = buildDocument(isPublic, newBody);
-			const saved = await updatePage(store, currentSlug, content);
+			const content = hasBody ? body.body as string : page.content;
+			const options: { isPublic?: boolean; title?: string } = {};
+			if (hasPublic) options.isPublic = body.public as boolean;
+			if (hasTitle) options.title = body.title as string;
+			const saved = await updatePage(store, currentSlug, content, options);
 			return c.json({ slug: saved!.slug, title: saved!.title, public: saved!.isPublic, updatedAt: saved!.updatedAt });
 		}
 
