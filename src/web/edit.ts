@@ -38,10 +38,9 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const slug = c.req.param("slug")!;
 		const store = c.get("store");
 		const page = await getPage(store, slug);
-		const isHome = slug === store.config.homeSlug;
 		if (!page) {
 			return c.html(renderTemplate("editor", {
-				page: null, slug, title: extractTitle(slug), path: extractPath(slug), public: true, body: "", isHome,
+				page: null, slug, title: extractTitle(slug), path: extractPath(slug), public: true, body: "",
 			}, { title: "New page", user: true, q: "", needsRender: true }));
 		}
 		const doc = parseDocument(page.content);
@@ -51,7 +50,6 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 			path: extractPath(slug),
 			public: page.isPublic,
 			body: doc.body,
-			isHome,
 		}, { title: `Edit: ${page.title}`, user: true, q: "", needsRender: true }));
 	});
 
@@ -72,7 +70,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 
 			// path 변경 시 rename (하위 페이지도 함께 이동)
 			const originalPath = extractPath(originalSlug);
-			if (pagePath !== originalPath && originalSlug !== store.config.homeSlug) {
+			if (pagePath !== originalPath) {
 				const lastSegment = originalSlug.includes("/")
 					? originalSlug.substring(originalSlug.lastIndexOf("/") + 1)
 					: originalSlug;

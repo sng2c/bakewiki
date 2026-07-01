@@ -89,7 +89,6 @@ ul.page-tree { padding-left:0; }
 fieldset { min-width:0; max-width:100%; }
 #editor-uploads { overflow:hidden; word-break:break-all; }
 .upload-item { overflow:hidden; }
-input[readonly] { opacity:0.6; cursor:not-allowed; }
 .preview-pane { border:1px solid var(--pico-muted-border-color,#ccc); border-radius:var(--pico-border-radius,0.25rem); padding:1rem; min-height:320px; overflow:auto; background:var(--pico-card-background-color,#f8f8f8); }
 </style>
 </head>
@@ -182,10 +181,10 @@ ${RENDER_SCRIPTS}
 <form action="/edit" method="post">
 <input type="hidden" name="originalSlug" value="{{#if page}}{{page.slug}}{{/if}}">
 <label>Title
-<input type="text" name="title" value="{{title}}" {{#if isHome}}readonly{{/if}}>
+<input type="text" name="title" value="{{title}}">
 </label>
 <label>Path <small>e.g. tech/web — leave empty for root</small>
-<input type="text" name="path" value="{{path}}" {{#if isHome}}readonly{{/if}}>
+<input type="text" name="path" value="{{path}}">
 </label>
 <label>
 <input type="checkbox" name="public" {{#if public}}checked{{/if}}> Public
