@@ -17,7 +17,7 @@ Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 
 // 재귀 트리 노드 partial — 모든 노드를 li로 출력.
 // 실제 페이지: file-text 아이콘 + 제목 / 빈 페이지: file 아이콘 + 회색 / private: lock 아이콘
-Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}" class="{{#if isEmpty}}empty{{/if}}">{{#if isEmpty}}<i data-lucide="file" style="width:13px;height:13px;vertical-align:-2px"></i>{{else}}<i data-lucide="file-text" style="width:13px;height:13px;vertical-align:-2px"></i>{{/if}} {{#if isEmpty}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a>{{#unless isPublic}} <i data-lucide="lock" class="tree-lock" style="width:12px;height:12px;vertical-align:-2px" title="private"></i>{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
+Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}" class="{{#if isEmpty}}empty{{/if}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}<i data-lucide="file-text" class="tree-icon"></i>{{/if}} {{#if isEmpty}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a>{{#unless isEmpty}}{{#unless isPublic}} <i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/unless}}{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
 
 // Template compile cache (name → compiled function)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
@@ -26,8 +26,10 @@ const RENDER_SCRIPTS = `
 <script src="${CDN.markdownit}"></script>
 <script src="${CDN.hljs_js}"></script>
 <script src="${CDN.katex_js}"></script>
-<script src="${CDN.katex_auto}"></script>
-<script src="https://unpkg.com/lucide@latest"></script>`;
+<script src="${CDN.katex_auto}"></script>`;
+
+// Lucide 아이콘 — 모든 페이지에서 사용되므로 layout 헤더에 항상 로드.
+const LUCIDE_SCRIPT = `<script src="https://unpkg.com/lucide@latest"></script>`;
 
 const TEMPLATES: Record<string, string> = {
 	layout: `<!DOCTYPE html>
@@ -39,6 +41,7 @@ const TEMPLATES: Record<string, string> = {
 <link rel="stylesheet" href="${CDN.pico}">
 <link rel="stylesheet" href="${CDN.hljs_css}">
 <link rel="stylesheet" href="${CDN.katex_css}">
+${LUCIDE_SCRIPT}
 <style>
 main.container { max-width: 800px; }
 nav.container-fluid { flex-wrap: wrap; }
@@ -77,6 +80,7 @@ ul.page-tree { padding-left:0; }
 .page-tree .tree-meta { color:var(--pico-muted-color,#999); font-size:0.75rem; }
 .page-tree a.empty { color:var(--pico-muted-color,#999); font-style:italic; }
 .page-tree .tree-lock { color:var(--pico-muted-color,#999); }
+.page-tree .tree-icon, .page-tree .tree-icon svg { width:13px!important; height:13px!important; vertical-align:-2px; display:inline-block; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
@@ -114,7 +118,7 @@ ${RENDER_SCRIPTS}
 {{#if devMode}}<script type="module" src="/@vite/client"></script>
 <script type="module" src="/src/client/editor.ts"></script>{{else}}<script src="/static/editor.js" defer></script>{{/if}}
 {{/if}}
-<script>function copySlug(s,b){navigator.clipboard.writeText(s).then(function(){var ic=b.querySelector('svg');if(ic){ic.style.color='#4ade80';setTimeout(function(){ic.style.color=''},1200)}b.classList.add('copied');setTimeout(function(){b.classList.remove('copied')},1200)})}window.addEventListener('DOMContentLoaded',function(){if(window.lucide)lucide.createIcons()})</script>
+<script>function copySlug(s,b){navigator.clipboard.writeText(s).then(function(){var ic=b.querySelector('svg');if(ic){ic.style.color='#4ade80';setTimeout(function(){ic.style.color=''},1200)}b.classList.add('copied');setTimeout(function(){b.classList.remove('copied')},1200)})}function runIcons(){if(window.lucide)lucide.createIcons()}window.addEventListener('DOMContentLoaded',runIcons);window.addEventListener('load',runIcons);</script>
 </body>
 </html>`,
 
@@ -128,7 +132,7 @@ ${RENDER_SCRIPTS}
 </ul></nav>
 <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:14px;height:14px"></i></span>
 </div>
-<small class="page-meta">{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
+<small class="page-meta">{{#if page.isPublic}}<i data-lucide="globe" style="width:13px;height:13px;vertical-align:-2px"></i> public{{else}}<i data-lucide="lock" style="width:13px;height:13px;vertical-align:-2px"></i> <strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
 </div>
 <article id="page-content"></article>
 <div id="page-attachments" style="margin-top:1.5rem"></div>
@@ -138,7 +142,7 @@ ${RENDER_SCRIPTS}
 	list: `<h1>All pages</h1>
 <ul class="page-tree">
 {{#each items}}
-<li class="tree-node"><a href="/pages/{{slug}}">{{#if isEmpty}}<i data-lucide="file" style="width:13px;height:13px;vertical-align:-2px"></i>{{else}}<i data-lucide="file-text" style="width:13px;height:13px;vertical-align:-2px"></i>{{/if}} {{#if title}}{{title}}{{else}}{{name}}{{/if}}</a>{{#unless isPublic}} <i data-lucide="lock" class="tree-lock" style="width:12px;height:12px;vertical-align:-2px" title="private"></i>{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
+<li class="tree-node"><a href="/pages/{{slug}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}<i data-lucide="file-text" class="tree-icon"></i>{{/if}} {{#if title}}{{title}}{{else}}{{name}}{{/if}}</a>{{#unless isEmpty}}{{#unless isPublic}} <i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/unless}}{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
 {{/each}}
 </ul>`,
 
