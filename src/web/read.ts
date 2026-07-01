@@ -122,7 +122,7 @@ async function renderPage(store: Store, slug: string, authed: boolean): Promise<
 		title,
 		slug,
 		user: authed,
-		pageData: JSON.stringify({ title, slug, body: `# ${title}\n\n${doc.body}` }),
+		pageData: JSON.stringify({ title, slug, isPublic: page.isPublic, body: `# ${title}\n\n${doc.body}` }),
 	};
 	return renderTemplate("page", view, { title: title || page.slug, user: authed, q: "", needsPageRender: true });
 }
