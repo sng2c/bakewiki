@@ -33,31 +33,32 @@ Commands:
   import <dir>      Import markdown folder into wiki
   export <dir>      Export wiki to markdown folder
   remote <cmd>      Remote page operations
-  llm <cmd>         Same as remote but JSON output (LLM-friendly)
+  llm <cmd>         LLM-friendly interface (JSON + Markdown)
 
 Serve options:
   --host <addr>     Bind address (default: 127.0.0.1, env: BAKEWIKI_HOST)
   --port <number>   Port number (default: 3000, env: BAKEWIKI_PORT)
 
 Remote commands:
-  list [options]                             List pages
-  get <slug> [options]                           Get page content
-  create <slug> <file> [options]                 Create/update page
-  rename <old> <new> [options]                   Rename page
-  delete <slug> [options]                        Delete page
-  search <query> [options]                       Search pages
-  sitemap [options]                           Show page tree
-  health [options]                            Health check
-  file <list|upload|delete> [options]            Manage uploaded images
+  list                               List pages
+  get <slug> [slug2 ...]            Get page content
+  create <slug> <file>              Create/update page
+  rename <old> <new>                Rename page
+  patch <slug> [options]            Partially update page
+  delete <slug>                     Delete page
+  search <query>                    Search pages
+  sitemap                           Show page tree
+  health                            Health check
+  file <list|upload|download|delete> Manage uploaded files
 
 Remote options (before or after subcommand):
   --url <url>     Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)
   --key <apikey>  API key (or set BAKEWIKI_API_KEY)
 
 LLM commands:
-  Same subcommands as remote (list, get, create, rename, patch, delete,
-  search, sitemap, health, file). Output is JSON except "get" which
-  outputs Markdown with YAML frontmatter. Use "llm help" for JSON help.
+  Same subcommands as remote. "get" outputs Markdown with YAML
+  frontmatter; all others output JSON on stdout.
+  Use "llm help" for structured JSON help.
 `);
 }
 
@@ -140,7 +141,7 @@ async function main(): Promise<void> {
 			const { opts: remoteOpts, rest: remoteRest } = extractRemoteOpts(rest);
 			const sub = remoteRest[0];
 			if (!sub) {
-				console.error("Usage: bakewiki remote [options] <list|get|create|rename|delete|search|sitemap|health|file>");
+				console.error("Usage: bakewiki remote [options] <list|get|create|rename|patch|delete|search|sitemap|health|file>");
 				process.exit(1);
 			}
 			await remoteCommand(sub, remoteRest.slice(1), remoteOpts);
