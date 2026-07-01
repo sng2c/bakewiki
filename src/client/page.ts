@@ -124,10 +124,7 @@ function renderAttachments(slug) {
 				var f = data.files[i];
 				var li = document.createElement('li');
 				li.style.cssText = 'display:flex;align-items:center;gap:0.5rem;min-height:2em;margin:0;';
-				var dot = document.createElement('span');
-				dot.textContent = '•';
-				dot.style.cssText = 'color:var(--pico-muted-color,#999);flex:0 0 auto;line-height:1;';
-				li.appendChild(dot);
+
 				var isImage = f.ext && IMAGE_EXT.indexOf(f.ext) !== -1;
 				if (isImage) {
 					var a = document.createElement('a');
@@ -135,28 +132,42 @@ function renderAttachments(slug) {
 					a.target = '_blank';
 					a.rel = 'noopener';
 					a.style.cssText = 'display:flex;align-items:center;gap:0.5rem';
+					var thumb = document.createElement('span');
+					thumb.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee);overflow:hidden;flex-shrink:0';
 					var img = document.createElement('img');
 					img.src = f.url;
 					img.alt = f.original;
-					img.style.cssText = 'width:2em;height:2em;object-fit:cover;border-radius:4px;flex:0 0 auto';
-					a.appendChild(img);
+					img.style.cssText = 'width:48px;height:48px;object-fit:cover';
+					thumb.appendChild(img);
+					a.appendChild(thumb);
 					var name = document.createElement('span');
 					name.textContent = f.original;
 					name.style.cssText = 'flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
 					a.appendChild(name);
 					li.appendChild(a);
 				} else {
+					var thumb = document.createElement('span');
+					thumb.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee);flex-shrink:0';
+					var fileIcon = document.createElement('i');
+					fileIcon.setAttribute('data-lucide', 'file');
+					fileIcon.style.cssText = 'width:24px;height:24px;color:var(--pico-muted-color,#999)';
+					thumb.appendChild(fileIcon);
 					var link = document.createElement('a');
 					link.href = f.url;
 					link.target = '_blank';
 					link.rel = 'noopener';
-					link.textContent = f.original;
-					link.style.cssText = 'display:inline-block;max-width:70ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+					link.style.cssText = 'display:flex;align-items:center;gap:0.5rem';
+					link.appendChild(thumb);
+					var name = document.createElement('span');
+					name.textContent = f.original;
+					name.style.cssText = 'flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+					link.appendChild(name);
 					li.appendChild(link);
 				}
 				list.appendChild(li);
 			}
 			container.appendChild(list);
+			if (window.lucide) window.lucide.createIcons();
 		})
 		.catch(function () {});
 }
