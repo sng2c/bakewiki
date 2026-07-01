@@ -11,7 +11,8 @@ type TreeNode = {
 	slug?: string;
 	title?: string;
 	isPublic?: boolean;
-	isPage: boolean;
+	isPage: boolean;       // 실제 index.md 존재 여부
+	isEmpty: boolean;      // index.md 없는 폴더 (빈 페이지)
 	isDir: boolean;
 	dirPath?: string;
 	children: TreeNode[];
@@ -71,8 +72,9 @@ function buildPageTree(pages: Array<{ slug: string; title: string; isPublic: boo
 			name: n.name,
 			slug: n.slug,
 			title: n.title,
-			isPublic: n.isPublic,
+			isPublic: n.isPage ? n.isPublic : undefined,  // 빈 폴더는 public/private 구분 없음
 			isPage: n.isPage,
+			isEmpty: !n.isPage,                           // index.md 없으면 빈 페이지
 			isDir: n.children.size > 0 && !n.isPage,
 			dirPath: dirPath || undefined,
 			children: sorted.map((c) => {
@@ -90,7 +92,7 @@ function buildBreadcrumb(slug: string, title: string) {
 	const segments = slug.split("/");
 	const items: Array<{ name: string; href?: string; current?: boolean }> = [];
 	// 홈 표시
-	items.push({ name: "홈", href: "/" });
+	items.push({ name: "Home", href: "/" });
 	let acc = "";
 	for (let i = 0; i < segments.length; i++) {
 		acc = acc ? `${acc}/${segments[i]}` : segments[i];
@@ -152,6 +154,7 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 			title: indexPage?.title,
 			isPublic: indexPage?.isPublic ?? true,
 			isPage: true,
+			isEmpty: false,
 			isDir: false,
 			dirPath: undefined,
 			children: childTree,
@@ -177,7 +180,10 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 
 		const html = await renderPage(store, slug, !!user);
 		if (html) return c.html(html);
-		return c.html(renderTemplate("notFound", { slug, canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
+		// 없는 페이지: slug의 마지막 세그먼트를 제목으로. 404가 아닌 200 + 빈 페이지 템플릿.
+		const segs = slug.split("/");
+		const title = segs[segs.length - 1];
+		return c.html(renderTemplate("notFound", { slug, title, canCreate: !!user }, { title: `${title} - bakewiki`, user: !!user, q: "", needsPageRender: false }));
 	});
 
 	return app;

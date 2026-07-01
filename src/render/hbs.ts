@@ -15,8 +15,9 @@ const CDN = {
 Handlebars.registerHelper("eq", (a, b) => a === b);
 Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 
-// 재귀 트리 노드 partial — 모든 노드를 li로 출력. 가상 폴더는 빈 페이지 링크로 표시.
-Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isDir}}{{dirPath}}{{else}}{{slug}}{{/if}}">{{#if isDir}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a> <small class="tree-meta">{{#if isDir}}{{dirPath}}{{else}}{{slug}}{{/if}}{{#unless isPublic}} 🔒{{/unless}}</small> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isDir}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
+// 재귀 트리 노드 partial — 모든 노드를 li로 출력.
+// 실제 페이지: file-text 아이콘 + 제목 / 빈 페이지: file 아이콘 + 회색 / private: lock 아이콘
+Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}" class="{{#if isEmpty}}empty{{/if}}">{{#if isEmpty}}<i data-lucide="file" style="width:13px;height:13px;vertical-align:-2px"></i>{{else}}<i data-lucide="file-text" style="width:13px;height:13px;vertical-align:-2px"></i>{{/if}} {{#if isEmpty}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a>{{#unless isPublic}} <i data-lucide="lock" class="tree-lock" style="width:12px;height:12px;vertical-align:-2px" title="private"></i>{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
 
 // Template compile cache (name → compiled function)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
@@ -74,6 +75,8 @@ ul.page-tree { padding-left:0; }
 .page-tree a:hover { text-decoration:underline; }
 .page-tree .tree-folder a { font-weight:500; }
 .page-tree .tree-meta { color:var(--pico-muted-color,#999); font-size:0.75rem; }
+.page-tree a.empty { color:var(--pico-muted-color,#999); font-style:italic; }
+.page-tree .tree-lock { color:var(--pico-muted-color,#999); }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
@@ -135,7 +138,7 @@ ${RENDER_SCRIPTS}
 	list: `<h1>All pages</h1>
 <ul class="page-tree">
 {{#each items}}
-<li class="tree-page"><a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em>untitled</em>{{/if}}</a> <small class="tree-meta">{{slug}}{{#unless isPublic}} 🔒{{/unless}}</small> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
+<li class="tree-node"><a href="/pages/{{slug}}">{{#if isEmpty}}<i data-lucide="file" style="width:13px;height:13px;vertical-align:-2px"></i>{{else}}<i data-lucide="file-text" style="width:13px;height:13px;vertical-align:-2px"></i>{{/if}} {{#if title}}{{title}}{{else}}{{name}}{{/if}}</a>{{#unless isPublic}} <i data-lucide="lock" class="tree-lock" style="width:12px;height:12px;vertical-align:-2px" title="private"></i>{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
 {{/each}}
 </ul>`,
 
@@ -154,15 +157,18 @@ ${RENDER_SCRIPTS}
 {{/if}}`,
 
 	notFound: `<article>
-<h1>Not found</h1>
-<p>The page <strong>{{slug}}</strong> does not exist.</p>
+<div class="empty-page">
+<i data-lucide="file" style="width:2rem;height:2rem;color:var(--pico-muted-color,#999)"></i>
+<h1>{{title}}</h1>
+<p style="color:var(--pico-muted-color,#999)">This page has no content yet.</p>
 {{#if canCreate}}
-<a href="/edit/{{slug}}" role="button">Create this page</a>
+<p><a href="/edit/{{slug}}" role="button"><i data-lucide="pencil" style="width:1rem;height:1rem;vertical-align:-2px"></i> Write this page</a></p>
 {{else}}
-<p><a href="/login">Login</a> to create it.</p>
+<p><small><a href="/login">Log in</a> to write this page.</small></p>
 {{/if}}
-<p><a href="/">Home</a></p>
+</div>
 </article>`,
+
 
 	login: `<article>
 <h1>Login</h1>
