@@ -57,6 +57,7 @@ Remote options (before or after subcommand):
 LLM commands:
   Same subcommands as remote (list, get, create, rename, patch, delete,
   search, sitemap, health, file). Output is always JSON on stdout.
+  Use "llm help" for structured JSON help.
 `);
 }
 

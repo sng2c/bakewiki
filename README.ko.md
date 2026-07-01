@@ -76,11 +76,15 @@ bakewiki remote [options] <command>
 | `get <slug> [slug2 ...]` | 문서 조회 — 배치 지원 | 필수 |
 | `create <slug> <file>` | 문서 생성/수정 | 필수 |
 | `rename <old> <new>` | 문서 이름 변경 | 필수 |
-| `patch <slug> [--slug ...] [--public ...] [--body ...]` | 부분 업데이트 | 필수 |
+| `patch <slug> [--slug ...] [--public ...] [--body ...] [--title ...]` | 부분 업데이트 | 필수 |
 | `delete <slug>` | 문서 삭제 | 필수 |
 | `search <query>` | 문서 검색 | 선택* |
 | `sitemap` | 문서 트리 | 선택* |
 | `health` | 상태 확인 | 없음 |
+| `file list [--slug <slug>]` | 업로드 목록 (페이지 필터 가능) | 필수 / 선택* |
+| `file upload <file\|-> [name] [--slug <slug>]` | 파일 업로드 | 필수 |
+| `file download <url\|filename> [output\|-]` | 파일 다운로드 | 없음 |
+| `file delete <filename>` | 파일 삭제 | 필수 |
 
 *인증 없이도 동작하지만, 비공개 문서 조회에는 인증 필요.
 
@@ -91,6 +95,16 @@ bakewiki remote [options] <command>
 bakewiki remote --key bk_xxx list
 bakewiki remote list --key bk_xxx
 bakewiki remote --url http://... --key bk_xxx get index
+```
+
+### LLM 명령
+
+`remote`와 동일한 서브커맨드지만, 모든 출력이 stdout에 JSON (에러는 stderr). 스크립트 및 LLM 도구 사용에 적합. → **[LLM CLI 전체 참조 →](docs/cli-llm.md)**
+
+```bash
+bakewiki llm --key bk_xxx list        # → JSON 배열
+bakewiki llm --key bk_xxx get index   # → JSON 객체
+bakewiki llm help                     # → JSON 도움말 스키마
 ```
 
 ### 환경변수
@@ -111,29 +125,35 @@ bakewiki remote --url http://... --key bk_xxx get index
 
 ```
 data/
-├── pages/           ← .md 파일 (슬러그 = 디렉토리 + 타이틀)
-│   ├── index.md
-│   └── tech/
-│       └── web/
-│           └── HTTP.md
-├── auth.json        ← 사용자 + 토큰
-├── config.yml       ← JWT 시크릿 (자동 생성)
+├── pages/              ← 페이지 디렉토리 (슬러그 = 경로)
+│   ├── index.md         ← 홈페이지 본문
+│   ├── meta.yml         ← 홈페이지 메타데이터
+│   └── tech/web/HTTP/
+│       ├── index.md     ← 페이지 본문 (순수 마크다운, frontmatter 없음)
+│       ├── meta.yml     ← {public, updatedAt, title?}
+│       └── photo.jpg    ← 업로드된 파일
+├── auth.json            ← 사용자 + 토큰
+└── config.yml           ← JWT 시크릿 (자동 생성)
 ```
 
-### 마크다운 형식
+### 페이지 파일
 
-```yaml
----
-public: true
----
-# 페이지 제목
+각 페이지는 디렉토리에 다음 파일들을 포함합니다:
 
-페이지 내용...
-```
+- **`index.md`** — 페이지 본문 (순수 마크다운, frontmatter 없음)
+- **`meta.yml`** — 메타데이터 (YAML):
+  ```yaml
+  public: true
+  updatedAt: "2026-06-29T12:00:00.000Z"
+  title: "커스텀 제목"    # 선택 오버라이드
+  ```
+- **첨부 파일** — 디렉토리 내의 다른 모든 파일 (이미지 등)
 
-- **제목**: 본문 첫 `#` 헤딩. frontmatter `title` 필드 없음.
-- **공개여부**: frontmatter `public`으로 제어 (기본값: `true`).
-- **슬러그**: 디렉토리 + 첫 `#` 헤딩에서 자동 유도. 예: `# HTTP` → 슬러그 `HTTP`, 디렉토리 `tech/web/` → `tech/web/HTTP`.
+### 제목 해석
+
+1. `meta.yml`의 `title` 필드 (명시적 오버라이드)
+2. `index.md`의 첫 `#` 헤딩
+3. 슬러그의 마지막 세그먼트 (예: `tech/web/HTTP` → `HTTP`)
 
 ### 링크 해석
 
@@ -143,205 +163,7 @@ public: true
   - 슬러그 `tech/web/HTTP`에서 `../API` → `tech/API` (삼촌)
   - 슬러그 `tech/web/HTTP`에서 `./HTTP/HTTPS` → `tech/web/HTTP/HTTPS` (자식)
 - **위키링크**: `[[slug]]` → `/pages/slug` (절대). `[[slug|표시 텍스트]]`로 링크 텍스트 지정.
-- **업로드 마커**: 본문의 `@@파일명` → 렌더링 시 `/uploads/<현재-slug>/파일명`으로 동적 변환. 페이지 rename 시 업로드 디렉토리만 rename, 본문은 그대로.
-
-## API
-
-모든 API 엔드포인트는 `/api` 하위. 인증은 `Authorization: Bearer <api-key>` 헤더 또는 세션 쿠키.
-
-### 문서
-
-#### 문서 목록
-
-```
-GET /api/pages
-```
-
-응답 `200`:
-```json
-{
-  "pages": [
-    { "slug": "index", "title": "홈", "isPublic": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-    { "slug": "docs/api", "title": "API 문서", "isPublic": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
-  ]
-}
-```
-미인증 요청은 공개 문서만 반환.
-
-#### 문서 조회
-
-```
-GET /api/pages/:slug
-```
-
-응답 `200`:
-```json
-{
-  "page": {
-    "slug": "index",
-    "title": "홈",
-    "content": "---\npublic: true\n---\n# 홈\n\n환영합니다!",
-    "isPublic": true,
-    "updatedAt": "2026-06-29T12:00:00.000Z"
-  }
-}
-```
-
-응답 `404`: `{ "error": "Not found" }`
-
-미인증 요청은 비공개 문서에 대해 404 반환.
-
-#### 문서 생성/수정
-
-```
-POST /api/pages/:slug
-Content-Type: application/json
-Authorization: Bearer <api-key>
-
-{ "content": "---\npublic: true\n---\n# 내 페이지\n\n안녕하세요" }
-```
-
-응답 `200`:
-```json
-{ "slug": "내-페이지", "title": "내 페이지", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
-```
-
-슬러그가 없으면 생성, 있으면 수정. `content`는 전체 문서 본문(frontmatter + markdown)이어야 함.
-
-#### 부분 업데이트 (PATCH)
-
-```
-PATCH /api/pages/:slug
-Content-Type: application/json
-Authorization: Bearer <api-key>
-```
-
-공개여부만 변경:
-```json
-{ "public": false }
-```
-
-본문만 변경:
-```json
-{ "body": "# 수정된 제목\n\n새 내용" }
-```
-
-이름 변경:
-```json
-{ "slug": "new-slug" }
-```
-
-참고: 이름 변경 시 리다이렉트가 생성되지 않습니다. 이전 슬러그는 404를 반환합니다.
-
-복합 변경:
-```json
-{ "slug": "new-name", "public": true, "body": "# 새 제목\n\n내용" }
-```
-
-응답 `200`:
-```json
-{ "slug": "new-name", "title": "새 제목", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
-```
-
-#### 문서 삭제
-
-```
-DELETE /api/pages/:slug
-Authorization: Bearer <api-key>
-```
-
-응답 `200`: `{ "ok": true }`
-
-응답 `404`: `{ "error": "Not found" }`
-
-### 검색
-
-```
-GET /api/search?q=키워드
-```
-
-응답 `200`:
-```json
-{
-  "results": [
-    { "slug": "index", "title": "홈", "snippet": "환영합니다. <mark>위키</mark>에 오신 것을" }
-  ]
-}
-```
-
-`q`가 없으면 빈 결과 반환. 미인증 요청은 공개 문서만 검색.
-
-### 사이트맵
-
-```
-GET /api/sitemap
-```
-
-응답 `200`:
-```json
-{
-  "tree": [
-    { "slug": "index", "title": "홈", "isPublic": true, "children": [
-      { "slug": "docs/api", "title": "API 문서", "isPublic": false, "children": [] }
-    ]}
-  ]
-}
-```
-
-모든 문서의 계층 트리 (title, isPublic 포함). 미인증 요청은 공개 문서만 포함.
-
-### 상태 확인
-
-```
-GET /api/health
-```
-
-응답 `200`: `{ "ok": true }`
-
-인증 불필요.
-
-### 업로드
-
-#### 파일 업로드
-
-```
-POST /api/upload
-Content-Type: multipart/form-data
-Authorization: Bearer <api-key>
-
-file: <binary>
-slug: <페이지-slug>
-```
-
-응답 `200`:
-```json
-{ "url": "/uploads/tech/web/HTTP/photo.jpg", "filename": "tech/web/HTTP/photo.jpg", "original": "photo.jpg", "ext": "jpg", "slug": "tech/web/HTTP", "size": 12345 }
-```
-
-파일은 `uploads/<slug>/<original>`에 저장. 본문에서 `@@<original>`로 참조 (렌더링 시 동적 변환).
-
-#### 업로드 목록
-
-```
-GET /api/upload              — 전체 (인증 필요)
-GET /api/upload/by-slug/:slug — 특정 페이지 (공개)
-```
-
-응답 `200`:
-```json
-{ "files": [{ "url": "/uploads/index/photo.jpg", "filename": "index/photo.jpg", "original": "photo.jpg", "ext": "jpg", "slug": "index", "size": 12345 }] }
-```
-
-#### 업로드 삭제
-
-```
-DELETE /api/upload/:filename
-Authorization: Bearer <api-key>
-```
-
-`filename`은 `<slug>/<original>` (예: `index/photo.jpg`).
-
-응답 `200`: `{ "ok": true }`
+- **업로드 마커**: 본문의 `@@파일명` → 렌더링 시 `/pages/<현재-slug>/파일명`으로 동적 변환. 페이지 rename 시 전체 디렉토리(업로드 포함)가 이동.
 
 ### 슬러그 규칙
 
@@ -351,6 +173,27 @@ Authorization: Bearer <api-key>
 - `tech/web/HTTP` 형태의 계층 슬러그
 - `index` 슬러그는 홈페이지 (`/`에서 서빙)
 - 슬러그 변경 시 기존 URL은 404 (리다이렉트 없음)
+
+## API
+
+→ **[API 전체 참조 →](docs/api.md)** (영어)
+
+간략 참조:
+
+| Method | Endpoint | Auth | 설명 |
+|--------|----------|------|------|
+| GET | `/api/pages` | 선택 | 문서 목록 (미인증: 공개만) |
+| GET | `/api/pages/:slug` | 선택 | 문서 조회 (비공개: 미인증 404) |
+| POST | `/api/pages/:slug` | 필수 | 문서 생성/수정 |
+| PATCH | `/api/pages/:slug` | 필수 | 부분 업데이트 (slug, public, body, title) |
+| DELETE | `/api/pages/:slug` | 필수 | 문서 삭제 |
+| GET | `/api/search?q=` | 선택 | 문서 검색 |
+| GET | `/api/sitemap` | 선택 | 문서 트리 |
+| GET | `/api/health` | 없음 | 상태 확인 |
+| POST | `/api/upload` | 필수 | 파일 업로드 |
+| GET | `/api/upload` | 필수 | 전체 업로드 목록 |
+| GET | `/api/upload/by-slug/:slug` | 선택 | 특정 페이지 업로드 목록 |
+| DELETE | `/api/upload/:filename` | 필수 | 업로드 삭제 |
 
 ## 개발
 

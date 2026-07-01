@@ -1,6 +1,6 @@
 {
   "name": "@sng2c/bakewiki",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An open-source GFM wiki for humans and LLMs",
   "type": "module",
   "license": "AGPL-3.0-or-later",

@@ -76,7 +76,7 @@ bakewiki remote [options] <command>
 | `get <slug> [slug2 ...]` | Get page(s) — batch supported | Required |
 | `create <slug> <file>` | Create/update page | Required |
 | `rename <old> <new>` | Rename page | Required |
-| `patch <slug> [--slug ...] [--public ...] [--body ...]` | Partial update | Required |
+| `patch <slug> [--slug ...] [--public ...] [--body ...] [--title ...]` | Partial update | Required |
 | `delete <slug>` | Delete page | Required |
 | `search <query>` | Search pages | Optional* |
 | `sitemap` | Show page tree | Optional* |
@@ -97,6 +97,16 @@ bakewiki remote list --key bk_xxx
 bakewiki remote --url http://... --key bk_xxx get index
 ```
 
+### LLM commands
+
+Same subcommands as `remote`, but all output is JSON on stdout (errors on stderr). Designed for scripting and LLM tool use. → **[Full LLM CLI reference →](docs/cli-llm.md)**
+
+```bash
+bakewiki llm --key bk_xxx list        # → JSON array
+bakewiki llm --key bk_xxx get index   # → JSON object
+bakewiki llm help                     # → JSON help schema
+```
+
 ### Environment variables
 
 A `.env` file in the project root is auto-loaded. See `.env.example` for reference.
@@ -115,29 +125,35 @@ A `.env` file in the project root is auto-loaded. See `.env.example` for referen
 
 ```
 data/
-├── pages/           ← .md files (slug = directory + title)
-│   ├── index.md
-│   └── tech/
-│       └── web/
-│           └── HTTP.md
-├── auth.json        ← users + tokens
-├── config.yml       ← JWT secret (auto-generated)
+├── pages/              ← page directories (slug = path)
+│   ├── index.md         ← homepage body
+│   ├── meta.yml         ← homepage metadata
+│   └── tech/web/HTTP/
+│       ├── index.md     ← page body (markdown, no frontmatter)
+│       ├── meta.yml     ← {public, updatedAt, title?}
+│       └── photo.jpg    ← uploaded file
+├── auth.json            ← users + tokens
+└── config.yml           ← JWT secret (auto-generated)
 ```
 
-### Markdown format
+### Page files
 
-```yaml
----
-public: true
----
-# Page Title
+Each page is a directory containing:
 
-Page content...
-```
+- **`index.md`** — Page body (pure markdown, no frontmatter)
+- **`meta.yml`** — Metadata (YAML):
+  ```yaml
+  public: true
+  updatedAt: "2026-06-29T12:00:00.000Z"
+  title: "Custom Title"    # optional override
+  ```
+- **Attachments** — Any other files in the directory (images, etc.)
 
-- **Title**: First `#` heading in the body. No `title` field in frontmatter.
-- **Public**: Controlled via `public` in frontmatter (default: `true`).
-- **Slug**: Derived from directory + title. E.g., `# HTTP` in `tech/web/` → slug `tech/web/HTTP`.
+### Title resolution
+
+1. `meta.yml` `title` field (explicit override)
+2. First `#` heading in `index.md`
+3. Last segment of the slug (e.g. `tech/web/HTTP` → `HTTP`)
 
 ### Link resolution
 
@@ -147,205 +163,7 @@ Page content...
   - From `tech/web/HTTP`: `../API` → `tech/API` (uncle)
   - From `tech/web/HTTP`: `./HTTP/HTTPS` → `tech/web/HTTP/HTTPS` (child)
 - **Wiki-links**: `[[slug]]` → `/pages/slug` (absolute). `[[slug|display text]]` for custom link text.
-- **Upload markers**: `@@filename` in content → resolved to `/uploads/<current-slug>/filename` at render time. Renaming a page only renames the upload directory, content stays untouched.
-
-## API
-
-All API endpoints are under `/api`. Authentication uses `Authorization: Bearer <api-key>` header or session cookie.
-
-### Pages
-
-#### List pages
-
-```
-GET /api/pages
-```
-
-Response `200`:
-```json
-{
-  "pages": [
-    { "slug": "index", "title": "Home", "isPublic": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-    { "slug": "docs/api", "title": "API Docs", "isPublic": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
-  ]
-}
-```
-Unauthenticated requests only return public pages.
-
-#### Get page
-
-```
-GET /api/pages/:slug
-```
-
-Response `200`:
-```json
-{
-  "page": {
-    "slug": "index",
-    "title": "Home",
-    "content": "---\npublic: true\n---\n# Home\n\nWelcome!",
-    "isPublic": true,
-    "updatedAt": "2026-06-29T12:00:00.000Z"
-  }
-}
-```
-
-Response `404`: `{ "error": "Not found" }`
-
-Unauthenticated requests return 404 for private pages.
-
-#### Create or update page
-
-```
-POST /api/pages/:slug
-Content-Type: application/json
-Authorization: Bearer <api-key>
-
-{ "content": "---\npublic: true\n---\n# My Page\n\nHello world" }
-```
-
-Response `200`:
-```json
-{ "slug": "my-page", "title": "My Page", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
-```
-
-Creates if the slug doesn't exist, updates if it does. `content` must be a string containing the full page body (frontmatter + markdown).
-
-#### Partial update (PATCH)
-
-```
-PATCH /api/pages/:slug
-Content-Type: application/json
-Authorization: Bearer <api-key>
-```
-
-Change public flag only:
-```json
-{ "public": false }
-```
-
-Change body only:
-```json
-{ "body": "# Updated Title\n\nNew content" }
-```
-
-Rename:
-```json
-{ "slug": "new-slug" }
-```
-
-Note: renaming does not create redirects. The old slug will return 404.
-
-Combine fields:
-```json
-{ "slug": "new-name", "public": true, "body": "# New Title\n\nContent" }
-```
-
-Response `200`:
-```json
-{ "slug": "new-name", "title": "New Title", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
-```
-
-#### Delete page
-
-```
-DELETE /api/pages/:slug
-Authorization: Bearer <api-key>
-```
-
-Response `200`: `{ "ok": true }`
-
-Response `404`: `{ "error": "Not found" }`
-
-### Search
-
-```
-GET /api/search?q=keyword
-```
-
-Response `200`:
-```json
-{
-  "results": [
-    { "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
-  ]
-}
-```
-
-Returns empty results if `q` is missing. Unauthenticated requests only search public pages.
-
-### Sitemap
-
-```
-GET /api/sitemap
-```
-
-Response `200`:
-```json
-{
-  "tree": [
-    { "slug": "index", "title": "Home", "isPublic": true, "children": [
-      { "slug": "docs/api", "title": "API Docs", "isPublic": false, "children": [] }
-    ]}
-  ]
-}
-```
-
-Hierarchical tree of all pages with title and visibility. Unauthenticated requests only include public pages.
-
-### Health
-
-```
-GET /api/health
-```
-
-Response `200`: `{ "ok": true }`
-
-No authentication required.
-
-### Uploads
-
-#### Upload file
-
-```
-POST /api/upload
-Content-Type: multipart/form-data
-Authorization: Bearer <api-key>
-
-file: <binary>
-slug: <page-slug>
-```
-
-Response `200`:
-```json
-{ "url": "/uploads/tech/web/HTTP/photo.jpg", "filename": "tech/web/HTTP/photo.jpg", "original": "photo.jpg", "ext": "jpg", "slug": "tech/web/HTTP", "size": 12345 }
-```
-
-Files are stored in `uploads/<slug>/<original>`. Use `@@<original>` in page content to reference uploads (resolved at render time).
-
-#### List uploads
-
-```
-GET /api/upload              — all uploads (auth required)
-GET /api/upload/by-slug/:slug — uploads for a specific page (public)
-```
-
-Response `200`:
-```json
-{ "files": [{ "url": "/uploads/index/photo.jpg", "filename": "index/photo.jpg", "original": "photo.jpg", "ext": "jpg", "slug": "index", "size": 12345 }] }
-```
-
-#### Delete upload
-
-```
-DELETE /api/upload/:filename
-Authorization: Bearer <api-key>
-```
-
-`filename` is `<slug>/<original>` (e.g. `index/photo.jpg`).
-
-Response `200`: `{ "ok": true }`
+- **Upload markers**: `@@filename` in content → resolved to `/pages/<current-slug>/filename` at render time. Renaming a page renames the entire directory (including uploads).
 
 ### Slug rules
 
@@ -354,6 +172,28 @@ Response `200`: `{ "ok": true }`
 - Unicode supported (e.g., `히히`, `파일들`)
 - Slugs like `tech/web/HTTP` create a hierarchy
 - The `index` slug is the home page (served at `/`)
+- Renaming a slug does not create redirects; the old slug returns 404
+
+## API
+
+→ **[Full API reference →](docs/api.md)**
+
+Quick reference:
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/pages` | Optional | List pages (public only without auth) |
+| GET | `/api/pages/:slug` | Optional | Get page (404 for private without auth) |
+| POST | `/api/pages/:slug` | Required | Create or update page |
+| PATCH | `/api/pages/:slug` | Required | Partial update (slug, public, body, title) |
+| DELETE | `/api/pages/:slug` | Required | Delete page |
+| GET | `/api/search?q=` | Optional | Search pages |
+| GET | `/api/sitemap` | Optional | Page tree |
+| GET | `/api/health` | None | Health check |
+| POST | `/api/upload` | Required | Upload file |
+| GET | `/api/upload` | Required | List all uploads |
+| GET | `/api/upload/by-slug/:slug` | Optional | List uploads for a page |
+| DELETE | `/api/upload/:filename` | Required | Delete upload |
 
 ## Development
 

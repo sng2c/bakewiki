@@ -30,6 +30,10 @@ export async function llmCommand(subcommand: string, allArgs: string[], opts: Re
 		return llmFileCommand(rest[0], rest.slice(1), opts);
 	}
 
+	if (subcommand === "help") {
+		return llmHelpCommand();
+	}
+
 	try {
 		switch (subcommand) {
 			case "list":
@@ -225,4 +229,36 @@ async function llmFileCommand(sub: string | undefined, args: string[], opts: Rem
 	} catch (e) {
 		fail(e instanceof Error ? e.message : String(e));
 	}
+}
+
+function llmHelpCommand(): void {
+	emit({
+		command: "llm",
+		description: "LLM-friendly JSON interface for bakewiki (same as remote but all output is JSON on stdout)",
+		options: {
+			"--url": "Server URL (default: http://127.0.0.1:3000, env: BAKEWIKI_URL)",
+			"--key": "API key (or set BAKEWIKI_API_KEY)",
+		},
+		subcommands: {
+			list: { args: [], description: "List all pages" },
+			get: { args: ["<slug>..."], description: "Get page content (one or more slugs)" },
+			create: { args: ["<slug>", "<file>"], description: "Create or update a page from a markdown file" },
+			rename: { args: ["<old>", "<new>"], description: "Rename a page" },
+			patch: { args: ["<slug>"], options: ["--slug", "--public", "--body", "--title"], description: "Partially update a page" },
+			delete: { args: ["<slug>"], description: "Delete a page" },
+			search: { args: ["<query>"], description: "Search pages" },
+			sitemap: { args: [], description: "Show page tree" },
+			health: { args: [], description: "Health check" },
+			file: {
+				description: "Manage uploaded files",
+				subcommands: {
+					"file list": { args: ["[--slug <slug>]"], description: "List files (optionally filter by page slug)" },
+					"file upload": { args: ["<file|->", "[name]", "[--slug <slug>]"], description: "Upload a file (use - for stdin)" },
+					"file download": { args: ["<url|filename>", "[output|-]"], description: "Download a file" },
+					"file delete": { args: ["<filename>"], description: "Delete a file" },
+				},
+			},
+			help: { args: [], description: "Show this help as JSON" },
+		},
+	});
 }
