@@ -22,7 +22,8 @@ const RENDER_SCRIPTS = `
 <script src="${CDN.markdownit}"></script>
 <script src="${CDN.hljs_js}"></script>
 <script src="${CDN.katex_js}"></script>
-<script src="${CDN.katex_auto}"></script>`;
+<script src="${CDN.katex_auto}"></script>
+<script src="https://unpkg.com/lucide@latest"></script>`;
 
 const TEMPLATES: Record<string, string> = {
 	layout: `<!DOCTYPE html>
@@ -50,6 +51,12 @@ article > :last-child { margin-bottom: 0; }
 .page-header nav[aria-label="breadcrumb"] li::before,
 .page-header nav[aria-label="breadcrumb"] li::after { content:none!important; }
 .page-header nav[aria-label="breadcrumb"] li + li::before { content:"/"!important; color:var(--pico-muted-color,#999); margin:0 3px!important; padding:0!important; display:inline-block; }
+.page-meta { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:var(--pico-muted-color,#999); }
+.page-header-left { display:inline-flex; align-items:center; gap:0.35rem; flex-wrap:wrap; }
+.copy-slug-btn, .icon-btn { display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:var(--pico-muted-color,#999); padding:1px; border-radius:3px; line-height:0; }
+.copy-slug-btn:hover, .icon-btn:hover { color:var(--pico-primary,#007bff); }
+.copy-slug-btn.copied svg { color:#4ade80!important; }
+[data-lucide] { stroke-width:2; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
@@ -87,27 +94,30 @@ ${RENDER_SCRIPTS}
 {{#if devMode}}<script type="module" src="/@vite/client"></script>
 <script type="module" src="/src/client/editor.ts"></script>{{else}}<script src="/static/editor.js" defer></script>{{/if}}
 {{/if}}
-<script>function copySlug(s){navigator.clipboard.writeText(s).then(function(){event.target.textContent='Copied!';setTimeout(function(){event.target.textContent='Copy slug'},2000)})}</script>
+<script>function copySlug(s,b){navigator.clipboard.writeText(s).then(function(){var ic=b.querySelector('svg');if(ic){ic.style.color='#4ade80';setTimeout(function(){ic.style.color=''},1200)}b.classList.add('copied');setTimeout(function(){b.classList.remove('copied')},1200)})}window.addEventListener('DOMContentLoaded',function(){if(window.lucide)lucide.createIcons()})</script>
 </body>
 </html>`,
 
 	page: `<div class="page-header">
+<div class="page-header-left">
 <nav aria-label="breadcrumb"><ul>
 {{#each breadcrumb}}
 <li>{{#if href}}<a href="{{href}}">{{name}}</a>{{else}}{{name}}{{/if}}</li>
 {{/each}}
 </ul></nav>
-<small>{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
+<span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:14px;height:14px"></i></span>{{#if user}}<a href="/edit/{{slug}}" class="icon-btn" title="Edit"><i data-lucide="pencil" style="width:14px;height:14px"></i></a>{{/if}}
+</div>
+<small class="page-meta">{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
 </div>
 <article id="page-content"></article>
 <div id="page-attachments" style="margin-top:1.5rem"></div>
-<p><small style="display:block;margin-top:1.5rem"><button type="button" onclick="copySlug('{{slug}}')" class="outline secondary" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Copy slug</button>{{#if user}} <a href="/edit/{{slug}}" role="button" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Edit</a>{{/if}}</small></p>
 <script id="page-data" type="application/json">{{{pageData}}}</script>`,
+
 
 	list: `<h1>All pages</h1>
 <ul style="list-style:none;padding:0 1rem">
 {{#each items}}
-<li style="margin-left:calc({{depth}} * 1.5rem)">{{#if isDir}}<a href="/pages/{{dirPath}}">{{name}}</a>{{else}}<a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em style="color:var(--pico-muted-color,#999)">untitled</em>{{/if}}</a> <small style="color:var(--pico-muted-color,#999)">{{slug}}{{#unless isPublic}} 🔒{{/unless}} <button type="button" onclick="copySlug('{{slug}}')" class="outline secondary" style="font-size:0.7rem;padding:0.1rem 0.4rem;margin:0">Copy</button></small>{{/if}}</li>
+<li style="margin-left:calc({{depth}} * 1.5rem)">{{#if isDir}}<a href="/pages/{{dirPath}}">{{name}}</a>{{else}}<a href="/pages/{{slug}}">{{#if title}}{{title}}{{else}}<em style="color:var(--pico-muted-color,#999)">untitled</em>{{/if}}</a> <small style="color:var(--pico-muted-color,#999)">{{slug}}{{#unless isPublic}} 🔒{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" style="width:12px;height:12px;vertical-align:-1px"></i></span></small>{{/if}}</li>
 {{/each}}
 </ul>`,
 
