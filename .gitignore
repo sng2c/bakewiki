@@ -35,3 +35,8 @@ Thumbs.db
 .idea/
 server.pid
 screenshots/
+scripts/screenshot.ts
+scripts/check-breadcrumb.ts
+playwright-report/
+test-results/
+screenshots/
