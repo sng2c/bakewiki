@@ -133,7 +133,7 @@ function renderAttachments(slug) {
 					a.rel = 'noopener';
 					a.style.cssText = 'display:flex;align-items:center;gap:0.5rem';
 					var thumb = document.createElement('span');
-					thumb.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid rgba(0,0,0,.08);overflow:hidden;flex-shrink:0';
+					thumb.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-card-border-color);overflow:hidden;flex-shrink:0';
 					var img = document.createElement('img');
 					img.src = f.url;
 					img.alt = f.original;
@@ -147,7 +147,7 @@ function renderAttachments(slug) {
 					li.appendChild(a);
 				} else {
 					var thumb = document.createElement('span');
-					thumb.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid rgba(0,0,0,.08);flex-shrink:0';
+					thumb.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-card-border-color);flex-shrink:0';
 					var fileIcon = document.createElement('i');
 					fileIcon.setAttribute('data-lucide', 'file');
 					fileIcon.style.cssText = 'width:24px;height:24px;color:var(--pico-muted-color,#999)';
