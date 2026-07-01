@@ -137,7 +137,7 @@ function renderAttachments(slug) {
 					var img = document.createElement('img');
 					img.src = f.url;
 					img.alt = f.original;
-					img.style.cssText = 'width:48px;height:48px;object-fit:cover';
+					img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:7px';
 					thumb.appendChild(img);
 					a.appendChild(thumb);
 					var name = document.createElement('span');

@@ -174,7 +174,7 @@ if (import.meta.hot) {
 			var img = document.createElement('img');
 			img.src = item.url;
 			img.alt = '';
-			img.style.cssText = 'width:48px;height:48px;object-fit:cover';
+			img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:7px';
 			preview.appendChild(img);
 		} else {
 			preview = document.createElement('span');
