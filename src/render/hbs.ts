@@ -44,9 +44,12 @@ article > :last-child { margin-bottom: 0; }
 .page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
 .page-header nav[aria-label="breadcrumb"] { margin:0; padding:0; }
 .page-header nav[aria-label="breadcrumb"] ul { margin:0; padding:0; display:flex; flex-wrap:wrap; align-items:center; gap:0; font-size:0.8rem; list-style:none; }
-.page-header nav[aria-label="breadcrumb"] li { margin:0; padding:0; display:inline-flex; align-items:center; }
-.page-header nav[aria-label="breadcrumb"] li::before { content:none; }
-.page-header nav[aria-label="breadcrumb"] li + li::before { content:"/"; color:var(--pico-muted-color,#999); margin:0 0.3em; }
+.page-header nav[aria-label="breadcrumb"] li { margin:0!important; padding:0!important; display:flex; align-items:center; }
+.page-header nav[aria-label="breadcrumb"] li + li { margin-left:0!important; }
+.page-header nav[aria-label="breadcrumb"] li a { padding:0!important; margin:0!important; text-decoration:none; display:flex; align-items:center; }
+.page-header nav[aria-label="breadcrumb"] li::before,
+.page-header nav[aria-label="breadcrumb"] li::after { content:none!important; }
+.page-header nav[aria-label="breadcrumb"] li + li::before { content:"/"!important; color:var(--pico-muted-color,#999); margin:0 3px!important; padding:0!important; display:inline-block; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
 fieldset { min-width:0; max-width:100%; }
@@ -97,8 +100,8 @@ ${RENDER_SCRIPTS}
 <small>{{#if page.isPublic}}public{{else}}<strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
 </div>
 <article id="page-content"></article>
-<div id="page-attachments"></div>
-<p><small><button type="button" onclick="copySlug('{{slug}}')" class="outline secondary" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Copy slug</button>{{#if user}} <a href="/edit/{{slug}}" role="button" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Edit</a>{{/if}}</small></p>
+<div id="page-attachments" style="margin-top:1.5rem"></div>
+<p><small style="display:block;margin-top:1.5rem"><button type="button" onclick="copySlug('{{slug}}')" class="outline secondary" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Copy slug</button>{{#if user}} <a href="/edit/{{slug}}" role="button" style="font-size:0.8rem;padding:0.2rem 0.6rem;margin:0">Edit</a>{{/if}}</small></p>
 <script id="page-data" type="application/json">{{{pageData}}}</script>`,
 
 	list: `<h1>All pages</h1>

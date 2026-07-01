@@ -1,4 +1,3 @@
-import { getRequestListener } from "@hono/node-server";
 import crypto from "node:crypto";
 import { resolveDataDir, initDataDir, readAuth, readConfig, writeConfig } from "./data.js";
 import { buildSearchIndex } from "./pages/search.js";
@@ -25,7 +24,7 @@ export async function createBackendListener(dataDirArg?: string) {
 	await buildSearchIndex(dataDir);
 
 	const app = await createApp(store);
-	return { listener: getRequestListener(app.fetch), dataDir };
+	return { app, dataDir };
 }
 
 // 개발 모드 플래그 설정

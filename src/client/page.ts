@@ -122,9 +122,15 @@ function renderAttachments(slug) {
 			h2.style.cssText = 'font-size:1em;color:var(--pico-muted-color,#999);margin-bottom:0.5rem';
 			container.appendChild(h2);
 			var list = document.createElement('ul');
+			list.style.cssText = 'list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.4rem;';
 			for (var i = 0; i < data.files.length; i++) {
 				var f = data.files[i];
 				var li = document.createElement('li');
+				li.style.cssText = 'display:flex;align-items:center;gap:0.5rem;min-height:2em;margin:0;';
+				var dot = document.createElement('span');
+				dot.textContent = '•';
+				dot.style.cssText = 'color:var(--pico-muted-color,#999);flex:0 0 auto;line-height:1;';
+				li.appendChild(dot);
 				var isImage = f.ext && IMAGE_EXT.indexOf(f.ext) !== -1;
 				if (isImage) {
 					var a = document.createElement('a');
