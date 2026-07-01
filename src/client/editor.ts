@@ -253,11 +253,18 @@ if (import.meta.hot) {
 	// ── Load existing uploads (filtered by current page slug) ──
 	if (listEl) {
 		var loadSlug = currentSlug();
-		var url = loadSlug ? '/api/upload/by-slug/' + encodeURIComponent(loadSlug) : '/api/upload';
-		fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
-			if (data && data.files) {
-				for (var i = 0; i < data.files.length; i++) appendUpload(data.files[i]);
-			}
-		}).catch(function () {});
-	}
+		if (!loadSlug) {
+			// 새 페이지: 아직 slug가 없으니 업로드 목록을 표시하지 않음.
+			var hint = document.createElement('p');
+			hint.textContent = 'Upload files after entering a title and path.';
+			hint.style.cssText = 'color:var(--pico-muted-color,#999);font-size:0.85rem';
+			listEl.appendChild(hint);
+		} else {
+			var url = '/api/upload/by-slug/' + encodeURIComponent(loadSlug);
+			fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+				if (data && data.files) {
+					for (var i = 0; i < data.files.length; i++) appendUpload(data.files[i]);
+				}
+			}).catch(function () {});
+		}
 })();
