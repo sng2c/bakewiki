@@ -49,6 +49,8 @@ textarea[name="content"] { min-height: 320px; font-family: monospace; }
 article { padding: 1rem; margin-top: 1rem; }
 article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
+article p:last-child { margin-bottom: 0; }
+
 .page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
 .page-header nav[aria-label="breadcrumb"] { margin:0; padding:0; }
 .page-header nav[aria-label="breadcrumb"] ul { margin:0; padding:0; display:flex; flex-wrap:wrap; align-items:center; gap:0; font-size:0.8rem; list-style:none; }
@@ -133,9 +135,8 @@ ${RENDER_SCRIPTS}
 </div>
 <small class="page-meta">{{#if page.isPublic}}<i data-lucide="globe" style="width:13px;height:13px;vertical-align:-2px"></i> public{{else}}<i data-lucide="lock" style="width:13px;height:13px;vertical-align:-2px"></i> <strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
 </div>
-<article id="page-content"></article>
-<div id="page-attachments" style="margin-top:1.5rem"></div>
-<script id="page-data" type="application/json">{{{pageData}}}</script>`,
+<article id="page-content" data-slug="{{slug}}" style="white-space:pre-wrap">{{body}}</article>
+<div id="page-attachments" style="margin-top:1.5rem"></div>`,
 
 
 	list: `<h1>All pages</h1>
@@ -158,19 +159,6 @@ ${RENDER_SCRIPTS}
 {{else}}
 <p><small>No results.</small></p>
 {{/if}}`,
-
-	notFound: `<article>
-<div class="empty-page">
-<i data-lucide="file" style="width:2rem;height:2rem;color:var(--pico-muted-color,#999)"></i>
-<h1>{{title}}</h1>
-<p style="color:var(--pico-muted-color,#999)">This page has no content yet.</p>
-{{#if canCreate}}
-<p><a href="/edit/{{slug}}" role="button"><i data-lucide="pencil" style="width:1rem;height:1rem;vertical-align:-2px"></i> Write this page</a></p>
-{{else}}
-<p><small><a href="/login">Log in</a> to write this page.</small></p>
-{{/if}}
-</div>
-</article>`,
 
 
 	login: `<article>
@@ -254,7 +242,7 @@ export function renderTemplate(name: string, data: Record<string, unknown>, layo
 	const tmpl = cache.get(name) ?? Handlebars.compile(TEMPLATES[name]);
 	if (!cache.has(name)) cache.set(name, tmpl);
 	const body = tmpl(data);
-	if (layoutData || name === "notFound") {
+	if (layoutData) {
 		const layout = cache.get("layout") ?? Handlebars.compile(TEMPLATES.layout);
 		if (!cache.has("layout")) cache.set("layout", layout);
 		return layout({ ...layoutData, body, title: layoutData?.title ?? name, devMode: _devMode });

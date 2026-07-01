@@ -15,6 +15,12 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		return idx < 0 ? "" : slug.slice(0, idx);
 	}
 
+	// 타이틀 추출: 슬러그에서 마지막 세그먼트.
+	function extractTitle(slug: string): string {
+		const idx = slug.lastIndexOf("/");
+		return idx < 0 ? slug : slug.slice(idx + 1);
+	}
+
 	// /edit 와 /edit/ → 새 문서
 	app.get("/edit", requireAuth, (c) => {
 		return c.html(renderTemplate("editor", {
@@ -29,7 +35,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const page = await getPage(store, slug);
 		if (!page) {
 			return c.html(renderTemplate("editor", {
-				page: null, slug, title: "", path: extractPath(slug), public: true, body: "",
+				page: null, slug, title: extractTitle(slug), path: extractPath(slug), public: true, body: "",
 			}, { title: "New page", user: true, q: "", needsRender: true }));
 		}
 		const doc = parseDocument(page.content);

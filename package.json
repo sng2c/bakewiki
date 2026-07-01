@@ -28,7 +28,7 @@
     "init": "tsx src/cli.ts init --data ./data",
     "serve": "tsx src/cli.ts serve --data ./data",
     "admin:create": "tsx src/cli.ts admin create --data ./data",
-    "build": "tsc && vite build"
+    "build": "tsc && vite build && cp dist/public/page.js dist/public/editor.js public/"
   },
   "dependencies": {
     "@hono/node-server": "2.0.6",

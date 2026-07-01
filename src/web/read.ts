@@ -107,36 +107,50 @@ function buildBreadcrumb(slug: string, title: string) {
 	return items;
 }
 
-// 공통: 단일 페이지를 렌더링. 없거나 권한 없으면 null.
-async function renderPage(store: Store, slug: string, authed: boolean): Promise<string | null> {
+// 공통: 단일 페이지 렌더링. 페이지가 있으면 본문, 없으면 빈 페이지 안내.
+async function renderPage(store: Store, slug: string, authed: boolean): Promise<string> {
 	const page = await getPage(store, slug);
-	if (!page) return null;
-	if (!page.isPublic && !authed) return null;
+	if (!page) {
+		// 없는 페이지: 빈 페이지 안내. 비인증도 볼 수 있음.
+		const segs = slug.split("/");
+		const title = segs[segs.length - 1];
+		const breadcrumb = buildBreadcrumb(slug, title);
+		const body = authed
+			? `# ${title}\n\n> This page doesn\u2019t have any content yet.\n\n[Write this page \u2192](/edit/${slug})`
+			: `# ${title}\n\n> This page doesn\u2019t have any content yet.\n\n[Log in](/login) to write this page.`;
+		return renderTemplate("page", {
+			page: { isPublic: true, updatedAt: "—" },
+			breadcrumb, body, title, slug, user: authed,
+		}, { title: `${title} - bakewiki`, user: authed, q: "", needsPageRender: true });
+	}
+	if (!page.isPublic && !authed) {
+		// private 페이지: 비인증에게는 빈 페이지처럼 안내
+		const title = page.title;
+		const breadcrumb = buildBreadcrumb(slug, title);
+		const body = `# ${title}\n\nThis page is private.\n\n[Log in](/login) to view it.`;
+		return renderTemplate("page", {
+			page: { isPublic: false, updatedAt: "\u2014" },
+			breadcrumb, body, title, slug, user: false,
+		}, { title: `${title} - bakewiki`, user: false, q: "", needsPageRender: true });
+	}
 	const doc = parseDocument(page.content);
 	const title = page.title;
 	const breadcrumb = buildBreadcrumb(slug, title);
-	const view = {
+	const body = `# ${title}\n\n${doc.body}`;
+	return renderTemplate("page", {
 		page: { ...page, updatedAt: page.updatedAt.slice(0, 10) },
-		breadcrumb,
-		body: `# ${title}\n\n${doc.body}`,
-		title,
-		slug,
-		user: authed,
-		pageData: JSON.stringify({ title, slug, isPublic: page.isPublic, body: `# ${title}\n\n${doc.body}` }),
-	};
-	return renderTemplate("page", view, { title: title || page.slug, user: authed, q: "", needsPageRender: true });
+		breadcrumb, body, title, slug, user: authed,
+	}, { title: title || page.slug, user: authed, q: "", needsPageRender: true });
 }
 
 export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUser | null } }> {
 	const app = new Hono<{ Variables: { store: Store; user: AuthUser | null } }>();
 
-	// 홈 = /index 페이지. 없으면 notFound.
+	// 홈 = /index 페이지.
 	app.get("/", async (c) => {
 		const user = c.get("user");
 		const store = c.get("store");
-		const html = await renderPage(store, "index", !!user);
-		if (html) return c.html(html);
-		return c.html(renderTemplate("notFound", { slug: "index", canCreate: !!user }, { title: "Not found", user: !!user, q: "" }), 404);
+		return c.html(await renderPage(store, "index", !!user));
 	});
 
 	// 전체 목록 (/pages)
@@ -177,13 +191,7 @@ export function webReadRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const slug = c.req.param("slug")!;
 		const user = c.get("user");
 		const store = c.get("store");
-
-		const html = await renderPage(store, slug, !!user);
-		if (html) return c.html(html);
-		// 없는 페이지: slug의 마지막 세그먼트를 제목으로. 404가 아닌 200 + 빈 페이지 템플릿.
-		const segs = slug.split("/");
-		const title = segs[segs.length - 1];
-		return c.html(renderTemplate("notFound", { slug, title, canCreate: !!user }, { title: `${title} - bakewiki`, user: !!user, q: "", needsPageRender: false }));
+		return c.html(await renderPage(store, slug, !!user));
 	});
 
 	return app;

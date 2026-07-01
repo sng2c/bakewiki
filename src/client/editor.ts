@@ -53,12 +53,6 @@ if (import.meta.hot) {
 		return computeSlug();
 	}
 
-	// Slug → upload directory path (strip leading/trailing /, keep internal /)
-	function slugToUploadDir(slug) {
-		if (!slug) return '_';
-		return slug.replace(/^\/+|\/+$/g, '');
-	}
-
 	// Resolve a wiki-link target to a URL. Absolute slug only.
 	function resolveWikiLink(target) {
 		return '/pages/' + target;
@@ -84,26 +78,25 @@ if (import.meta.hot) {
 		return true;
 	});
 
-	// Link resolution: standard URL — relative links resolve against parent path.
+	// Link resolution: relative paths resolve against current slug directory.
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
-		// @@<file> marker → upload reference, resolve with current slug
-		if (url.startsWith('@@')) {
-			var ufile = url.slice(2);
-			return defaultNormalizeLink('/pages/' + slugToUploadDir(currentSlug()) + '/' + ufile);
-		}
+		// 절대 경로: /pages/... 위키 경로는 그대로
 		if (url.startsWith('/pages/')) return defaultNormalizeLink(url);
-		// Legacy /uploads/ URLs
+		// 앱 라우트: /login, /edit, /auth, /search, /
+		if (url === '/' || url.startsWith('/login') || url.startsWith('/edit') || url.startsWith('/auth') || url.startsWith('/search')) return defaultNormalizeLink(url);
+		// 레거시 /uploads/ → /pages/
 		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url.replace('/uploads/', '/pages/'));
+		// 다른 /path는 위키 절대 경로
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
+		// 앵커
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
+		// 외부 URL
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
-		// Relative URL: resolve against parent path of current slug
+		// 상대 경로: 현재 slug 디렉토리 기준
 		var slug = currentSlug();
 		if (slug) {
-			var slashIdx = slug.lastIndexOf('/');
-			var pagePath = slashIdx >= 0 ? slug.substring(0, slashIdx) : '';
-			var parts = (pagePath ? pagePath.split('/') : []).concat(url.split('/'));
+			var parts = slug.split('/').concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }
@@ -176,14 +169,20 @@ if (import.meta.hot) {
 		var isImage = item.ext && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].indexOf(item.ext) !== -1;
 		var preview;
 		if (isImage) {
-			preview = document.createElement('img');
-			preview.src = item.url;
-			preview.alt = '';
-			preview.style.cssText = 'max-height:48px;max-width:48px;object-fit:cover;border-radius:4px';
+			preview = document.createElement('span');
+			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-color);overflow:hidden;flex-shrink:0';
+			var img = document.createElement('img');
+			img.src = item.url;
+			img.alt = '';
+			img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:7px';
+			preview.appendChild(img);
 		} else {
 			preview = document.createElement('span');
-			preview.textContent = '📄';
-			preview.style.cssText = 'font-size:32px;width:48px;height:48px;display:flex;align-items:center;justify-content:center';
+			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-color);flex-shrink:0';
+			var fileIcon = document.createElement('i');
+			fileIcon.setAttribute('data-lucide', 'file');
+			fileIcon.style.cssText = 'width:24px;height:24px;color:var(--pico-muted-color,#999)';
+			preview.appendChild(fileIcon);
 		}
 		preview.style.cursor = 'pointer';
 		preview.title = 'Click to insert';
@@ -194,15 +193,15 @@ if (import.meta.hot) {
 
 		var insertBtn = document.createElement('button');
 		insertBtn.type = 'button';
-		insertBtn.textContent = 'Insert';
-		insertBtn.className = 'secondary';
-		insertBtn.style.cssText = 'font-size:0.8rem;padding:0.2rem 0.6rem;margin:0';
+		insertBtn.innerHTML = '<i data-lucide="plus-circle" style="width:1rem;height:1rem"></i>';
+		insertBtn.title = 'Insert';
+		insertBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;color:var(--pico-primary)';
 
 		var delBtn = document.createElement('button');
 		delBtn.type = 'button';
-		delBtn.textContent = 'Delete';
-		delBtn.className = 'secondary';
-		delBtn.style.cssText = 'font-size:0.8rem;padding:0.2rem 0.6rem;margin:0;color:#c0392b';
+		delBtn.innerHTML = '<i data-lucide="trash-2" style="width:1rem;height:1rem"></i>';
+		delBtn.title = 'Delete';
+		delBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;color:#c0392b';
 		delBtn.addEventListener('click', async function () {
 			if (!confirm('Delete this file? ' + item.original)) return;
 			var ok = await deleteImage(item.filename);
@@ -210,10 +209,10 @@ if (import.meta.hot) {
 		});
 
 		function doInsert() {
-			// Use @@ marker — resolved at render time with current slug
-			var neutralUrl = '@@' + item.original;
-			var md = isImage ? '\n![](' + neutralUrl + ')\n' : '\n[' + item.original + '](' + neutralUrl + ')\n';
-			insertAtCursor(md);
+			// 삽입: 같은 디렉토리의 상대 경로
+			var insertUrl = item.original;
+			var mdText = isImage ? '\n![](' + insertUrl + ')\n' : '\n[' + item.original + '](' + insertUrl + ')\n';
+			insertAtCursor(mdText);
 		}
 		preview.addEventListener('click', doInsert);
 		insertBtn.addEventListener('click', doInsert);
@@ -223,6 +222,7 @@ if (import.meta.hot) {
 		row.appendChild(insertBtn);
 		row.appendChild(delBtn);
 		listEl.appendChild(row);
+		if (window.lucide) window.lucide.createIcons();
 	}
 
 	async function handleFiles(files) {
@@ -253,11 +253,19 @@ if (import.meta.hot) {
 	// ── Load existing uploads (filtered by current page slug) ──
 	if (listEl) {
 		var loadSlug = currentSlug();
-		var url = loadSlug ? '/api/upload/by-slug/' + encodeURIComponent(loadSlug) : '/api/upload';
-		fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
-			if (data && data.files) {
-				for (var i = 0; i < data.files.length; i++) appendUpload(data.files[i]);
-			}
-		}).catch(function () {});
+		if (!loadSlug) {
+			// 새 페이지: 아직 slug가 없으니 업로드 목록을 표시하지 않음.
+			var hint = document.createElement('p');
+			hint.textContent = 'Upload files after entering a title and path.';
+			hint.style.cssText = 'color:var(--pico-muted-color,#999);font-size:0.85rem';
+			listEl.appendChild(hint);
+		} else {
+			var url = '/api/upload/by-slug/' + encodeURIComponent(loadSlug);
+			fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+				if (data && data.files) {
+					for (var i = 0; i < data.files.length; i++) appendUpload(data.files[i]);
+				}
+			}).catch(function () {});
+		}
 	}
 })();
