@@ -158,19 +158,6 @@ ${RENDER_SCRIPTS}
 <p><small>No results.</small></p>
 {{/if}}`,
 
-	notFound: `<article>
-<div class="empty-page">
-<i data-lucide="file" style="width:2rem;height:2rem;color:var(--pico-muted-color,#999)"></i>
-<h1>{{title}}</h1>
-<p style="color:var(--pico-muted-color,#999)">This page has no content yet.</p>
-{{#if canCreate}}
-<p><a href="/edit/{{slug}}" role="button"><i data-lucide="pencil" style="width:1rem;height:1rem;vertical-align:-2px"></i> Write this page</a></p>
-{{else}}
-<p><small><a href="/login">Log in</a> to write this page.</small></p>
-{{/if}}
-</div>
-</article>`,
-
 
 	login: `<article>
 <h1>Login</h1>
@@ -253,7 +240,7 @@ export function renderTemplate(name: string, data: Record<string, unknown>, layo
 	const tmpl = cache.get(name) ?? Handlebars.compile(TEMPLATES[name]);
 	if (!cache.has(name)) cache.set(name, tmpl);
 	const body = tmpl(data);
-	if (layoutData || name === "notFound") {
+	if (layoutData) {
 		const layout = cache.get("layout") ?? Handlebars.compile(TEMPLATES.layout);
 		if (!cache.has("layout")) cache.set("layout", layout);
 		return layout({ ...layoutData, body, title: layoutData?.title ?? name, devMode: _devMode });
