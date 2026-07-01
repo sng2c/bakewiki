@@ -133,9 +133,8 @@ ${RENDER_SCRIPTS}
 </div>
 <small class="page-meta">{{#if page.isPublic}}<i data-lucide="globe" style="width:13px;height:13px;vertical-align:-2px"></i> public{{else}}<i data-lucide="lock" style="width:13px;height:13px;vertical-align:-2px"></i> <strong>private</strong>{{/if}} · updated {{page.updatedAt}}</small>
 </div>
-<article id="page-content"></article>
-<div id="page-attachments" style="margin-top:1.5rem"></div>
-<script id="page-data" type="application/json">{{{pageData}}}</script>`,
+<article id="page-content" data-slug="{{slug}}" style="white-space:pre-wrap">{{body}}</article>
+<div id="page-attachments" style="margin-top:1.5rem"></div>`,
 
 
 	list: `<h1>All pages</h1>

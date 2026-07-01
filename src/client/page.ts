@@ -7,11 +7,11 @@ if (import.meta.hot) {
 }
 
 (function () {
-	var raw = document.getElementById('page-data');
-	if (!raw) return;
-	var d = JSON.parse(raw.textContent);
 	var el = document.getElementById('page-content');
 	if (!el) return;
+	// 원문은 SSR로 <article>에 이스케이프된 텍스트로 들어있음.
+	// textContent로 읽어 마크다운 렌더링 후 HTML로 교체.
+	var d = { body: el.textContent, slug: el.getAttribute('data-slug') || '' };
 
 	var md = window.markdownit({
 		html: true,
