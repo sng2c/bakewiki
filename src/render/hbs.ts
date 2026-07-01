@@ -57,9 +57,10 @@ article > :last-child { margin-bottom: 0; }
 .copy-slug-btn:hover, .icon-btn:hover { color:var(--pico-primary,#007bff); }
 .copy-slug-btn.copied svg { color:#4ade80!important; }
 [data-lucide] { stroke-width:2; }
-.edit-fab { position:relative; bottom:auto; right:auto; display:inline-flex; align-items:center; justify-content:center; width:2.4rem; height:2.4rem; border-radius:50%; background:var(--pico-card-background-color,#fff); color:var(--pico-muted-color,#666); box-shadow:0 2px 8px rgba(0,0,0,0.15); border:1px solid var(--pico-muted-border-color,#ddd); transition:all .15s ease; }
+.edit-fab { position:relative; bottom:auto; right:auto; display:inline-flex; align-items:center; justify-content:center; gap:0.3rem; height:2.4rem; padding:0 0.7rem; border-radius:9999px; background:var(--pico-card-background-color,#fff); color:var(--pico-muted-color,#666); box-shadow:0 2px 8px rgba(0,0,0,0.15); border:1px solid var(--pico-muted-border-color,#ddd); transition:all .15s ease; }
 .edit-fab:hover { color:var(--pico-primary,#007bff); box-shadow:0 4px 12px rgba(0,0,0,0.2); transform:translateY(-1px); }
 .edit-fab [data-lucide], .edit-fab svg { width:1.1rem; height:1.1rem; }
+.fab-label { font-size:0.75rem; font-weight:600; }
 .fab-group { position:fixed; bottom:1rem; right:1rem; z-index:50; display:flex; flex-direction:column; gap:0.6rem; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
@@ -102,7 +103,7 @@ ${RENDER_SCRIPTS}
 </body>
 </html>`,
 
-	page: `{{#if user}}<div class="fab-group"><a href="/edit" class="edit-fab" title="New page"><i data-lucide="plus"></i></a><a href="/edit/{{slug}}" class="edit-fab" title="Edit page"><i data-lucide="pencil"></i></a></div>{{/if}}
+	page: `{{#if user}}<div class="fab-group"><a href="/edit" class="edit-fab" title="New page"><i data-lucide="plus"></i><span class="fab-label">New</span></a><a href="/edit/{{slug}}" class="edit-fab" title="Edit page"><i data-lucide="pencil"></i><span class="fab-label">Edit</span></a></div>{{/if}}
 <div class="page-header">
 <div class="page-header-left">
 <nav aria-label="breadcrumb"><ul>
