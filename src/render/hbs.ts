@@ -17,7 +17,7 @@ Handlebars.registerHelper("json", (v) => JSON.stringify(v));
 
 // 재귀 트리 노드 partial — 모든 노드를 li로 출력.
 // 실제 페이지: file-text 아이콘 + 제목 / 빈 페이지: file 아이콘 + 회색 / private: lock 아이콘
-Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}" class="{{#if isEmpty}}empty{{/if}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}<i data-lucide="file-text" class="tree-icon"></i>{{/if}} {{#if isEmpty}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a>{{#unless isEmpty}}{{#unless isPublic}} <i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/unless}}{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
+Handlebars.registerPartial("treeNode", `{{#each children}}<li class="tree-node"><a href="/pages/{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}" class="{{#if isEmpty}}empty{{/if}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}{{#if isPublic}}<i data-lucide="file-text" class="tree-icon"></i>{{else}}<i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/if}}{{/if}} {{#if isEmpty}}{{name}}{{else}}{{#if title}}{{title}}{{else}}{{name}}{{/if}}{{/if}}</a> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{#if isEmpty}}{{dirPath}}{{else}}{{slug}}{{/if}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>{{/each}}`);
 
 // Template compile cache (name → compiled function)
 const cache = new Map<string, HandlebarsTemplateDelegate>();
@@ -79,7 +79,6 @@ ul.page-tree { padding-left:0; }
 .page-tree .tree-folder a { font-weight:500; }
 .page-tree .tree-meta { color:var(--pico-muted-color,#999); font-size:0.75rem; }
 .page-tree a.empty { color:var(--pico-muted-color,#999); font-style:italic; }
-.page-tree .tree-lock { color:var(--pico-muted-color,#999); }
 .page-tree .tree-icon, .page-tree .tree-icon svg { width:13px!important; height:13px!important; vertical-align:-2px; display:inline-block; }
 .editor-split { display:grid; grid-template-columns:1fr; gap:1rem; }
 .editor-split > div { min-width:0; overflow:hidden; }
@@ -142,7 +141,7 @@ ${RENDER_SCRIPTS}
 	list: `<h1>All pages</h1>
 <ul class="page-tree">
 {{#each items}}
-<li class="tree-node"><a href="/pages/{{slug}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}<i data-lucide="file-text" class="tree-icon"></i>{{/if}} {{#if title}}{{title}}{{else}}{{name}}{{/if}}</a>{{#unless isEmpty}}{{#unless isPublic}} <i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/unless}}{{/unless}} <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
+<li class="tree-node"><a href="/pages/{{slug}}">{{#if isEmpty}}<i data-lucide="file" class="tree-icon"></i>{{else}}{{#if isPublic}}<i data-lucide="file-text" class="tree-icon"></i>{{else}}<i data-lucide="lock" class="tree-icon tree-lock" title="private"></i>{{/if}}{{/if}} {{#if title}}{{title}}{{else}}{{name}}{{/if}}</a> <span class="copy-slug-btn" title="Copy slug" onclick="copySlug('{{slug}}',this)"><i data-lucide="copy" class="tree-icon"></i></span>{{#if children.length}}<ul>{{> treeNode children=children}}</ul>{{/if}}</li>
 {{/each}}
 </ul>`,
 
