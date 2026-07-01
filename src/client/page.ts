@@ -27,11 +27,6 @@ if (import.meta.hot) {
 		}
 	});
 
-	// Slug → upload directory path (strip leading/trailing /, keep internal /)
-	function slugToUploadDir(slug) {
-		if (!slug) return '_';
-		return slug.replace(/^\/+|\/+$/g, '');
-	}
 
 	// Resolve a wiki-link target to a URL. Absolute slug only.
 	function resolveWikiLink(target) {
@@ -62,23 +57,23 @@ if (import.meta.hot) {
 	// Slug = "tech/web/http" → path = "tech/web" (parent path).
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
-		// @@<file> marker → upload reference, resolve with current slug
-		if (url.startsWith('@@') && d.slug) {
-			var ufile = url.slice(2);
-			return defaultNormalizeLink('/pages/' + slugToUploadDir(d.slug) + '/' + ufile);
-		}
+		// 절대 경로: /pages/... 위키 경로는 그대로
 		if (url.startsWith('/pages/')) return defaultNormalizeLink(url);
-		// Legacy /uploads/ URLs redirect to /pages/
+		// 앱 라우트: /login, /edit, /auth, /search, /
+		if (url === '/' || url.startsWith('/login') || url.startsWith('/edit') || url.startsWith('/auth') || url.startsWith('/search')) return defaultNormalizeLink(url);
+		// 레거시 /uploads/ → /pages/
 		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url.replace('/uploads/', '/pages/'));
+		// 다른 /path는 위키 절대 경로
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
+		// 앵커
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
+		// 외부 URL (http:, https:, mailto: 등)
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
-		// Relative URL: resolve against parent path of current slug
+		// 상대 경로: 현재 slug 디렉토리 기준으로 해석
+		// ![](photo.jpg) → /pages/tech/web/HTTPS/photo.jpg
 		var base = d.slug;
 		if (base) {
-			var slashIdx = base.lastIndexOf('/');
-			var pagePath = slashIdx >= 0 ? base.substring(0, slashIdx) : '';
-			var parts = (pagePath ? pagePath.split('/') : []).concat(url.split('/'));
+			var parts = base.split('/').concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }

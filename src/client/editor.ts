@@ -53,12 +53,6 @@ if (import.meta.hot) {
 		return computeSlug();
 	}
 
-	// Slug → upload directory path (strip leading/trailing /, keep internal /)
-	function slugToUploadDir(slug) {
-		if (!slug) return '_';
-		return slug.replace(/^\/+|\/+$/g, '');
-	}
-
 	// Resolve a wiki-link target to a URL. Absolute slug only.
 	function resolveWikiLink(target) {
 		return '/pages/' + target;
@@ -84,31 +78,34 @@ if (import.meta.hot) {
 		return true;
 	});
 
-	// Link resolution: standard URL — relative links resolve against parent path.
+	// Link resolution: relative paths resolve against current slug directory.
 	var defaultNormalizeLink = md.normalizeLink.bind(md);
 	md.normalizeLink = function (url) {
-		// @@<file> marker → upload reference, resolve with current slug
-		if (url.startsWith('@@')) {
-			var ufile = url.slice(2);
-			return defaultNormalizeLink('/pages/' + slugToUploadDir(currentSlug()) + '/' + ufile);
-		}
+		// 절대 경로: /pages/... 위키 경로는 그대로
 		if (url.startsWith('/pages/')) return defaultNormalizeLink(url);
-		// Legacy /uploads/ URLs
+		// 앱 라우트: /login, /edit, /auth, /search, /
+		if (url === '/' || url.startsWith('/login') || url.startsWith('/edit') || url.startsWith('/auth') || url.startsWith('/search')) return defaultNormalizeLink(url);
+		// 레거시 /uploads/ → /pages/
 		if (url.startsWith('/uploads/')) return defaultNormalizeLink(url.replace('/uploads/', '/pages/'));
+		// 다른 /path는 위키 절대 경로
 		if (url.startsWith('/') && !url.startsWith('//')) return defaultNormalizeLink('/pages' + url);
+		// 앵커
 		if (url.startsWith('#')) return defaultNormalizeLink(url);
+		// 외부 URL
 		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return defaultNormalizeLink(url);
-		// Relative URL: resolve against parent path of current slug
+		// 상대 경로: 현재 slug 디렉토리 기준
 		var slug = currentSlug();
 		if (slug) {
-			var slashIdx = slug.lastIndexOf('/');
-			var pagePath = slashIdx >= 0 ? slug.substring(0, slashIdx) : '';
-			var parts = (pagePath ? pagePath.split('/') : []).concat(url.split('/'));
+			var parts = slug.split('/').concat(url.split('/'));
 			var resolved = [];
 			for (var i = 0; i < parts.length; i++) {
 				if (parts[i] === '..') { if (resolved.length > 0) resolved.pop(); }
 				else if (parts[i] !== '.' && parts[i] !== '') resolved.push(parts[i]);
 			}
+			return defaultNormalizeLink('/pages/' + resolved.join('/'));
+		}
+		return defaultNormalizeLink(url);
+	};
 			return defaultNormalizeLink('/pages/' + resolved.join('/'));
 		}
 		return defaultNormalizeLink(url);
@@ -210,9 +207,9 @@ if (import.meta.hot) {
 		});
 
 		function doInsert() {
-			// Use @@ marker — resolved at render time with current slug
-			var neutralUrl = '@@' + item.original;
-			var md = isImage ? '\n![](' + neutralUrl + ')\n' : '\n[' + item.original + '](' + neutralUrl + ')\n';
+			// 삽입: 같은 디렉토리의 상대 경로
+			var insertUrl = item.original;
+			var md = isImage ? '\n![](' + insertUrl + ')\n' : '\n[' + item.original + '](' + insertUrl + ')\n';
 			insertAtCursor(md);
 		}
 		preview.addEventListener('click', doInsert);
