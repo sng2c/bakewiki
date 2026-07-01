@@ -106,10 +106,6 @@ if (import.meta.hot) {
 		}
 		return defaultNormalizeLink(url);
 	};
-			return defaultNormalizeLink('/pages/' + resolved.join('/'));
-		}
-		return defaultNormalizeLink(url);
-	};
 
 	function update() {
 		pv.innerHTML = md.render(ta.value);
