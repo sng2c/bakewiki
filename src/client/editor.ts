@@ -172,11 +172,14 @@ if (import.meta.hot) {
 			preview = document.createElement('img');
 			preview.src = item.url;
 			preview.alt = '';
-			preview.style.cssText = 'max-height:48px;max-width:48px;object-fit:cover;border-radius:4px';
+			preview.style.cssText = 'max-height:48px;max-width:48px;object-fit:cover;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee)';
 		} else {
 			preview = document.createElement('span');
-			preview.textContent = '📄';
-			preview.style.cssText = 'font-size:32px;width:48px;height:48px;display:flex;align-items:center;justify-content:center';
+			preview.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--pico-muted-border-color,#eee)';
+			var fileIcon = document.createElement('i');
+			fileIcon.setAttribute('data-lucide', 'file');
+			fileIcon.style.cssText = 'width:24px;height:24px;color:var(--pico-muted-color,#999)';
+			preview.appendChild(fileIcon);
 		}
 		preview.style.cursor = 'pointer';
 		preview.title = 'Click to insert';
@@ -187,13 +190,13 @@ if (import.meta.hot) {
 
 		var insertBtn = document.createElement('button');
 		insertBtn.type = 'button';
-		insertBtn.textContent = 'Insert';
+		insertBtn.innerHTML = '<i data-lucide="plus-circle" style="width:1rem;height:1rem;vertical-align:-2px"></i>';
 		insertBtn.className = 'secondary';
 		insertBtn.style.cssText = 'font-size:0.8rem;padding:0.2rem 0.6rem;margin:0';
 
 		var delBtn = document.createElement('button');
 		delBtn.type = 'button';
-		delBtn.textContent = 'Delete';
+		delBtn.innerHTML = '<i data-lucide="trash-2" style="width:1rem;height:1rem;vertical-align:-2px"></i>';
 		delBtn.className = 'secondary';
 		delBtn.style.cssText = 'font-size:0.8rem;padding:0.2rem 0.6rem;margin:0;color:#c0392b';
 		delBtn.addEventListener('click', async function () {
@@ -216,6 +219,7 @@ if (import.meta.hot) {
 		row.appendChild(insertBtn);
 		row.appendChild(delBtn);
 		listEl.appendChild(row);
+		if (window.lucide) window.lucide.createIcons();
 	}
 
 	async function handleFiles(files) {
