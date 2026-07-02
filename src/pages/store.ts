@@ -83,7 +83,7 @@ export async function createPage(store: Store, slug: string, content: string, op
 	return { slug: resolvedSlug, title, content, isPublic, updatedAt: now };
 }
 
-export async function updatePage(store: Store, slug: string, content: string, options?: { isPublic?: boolean }): Promise<Page | null> {
+export async function updatePage(store: Store, slug: string, content: string, options?: { isPublic?: boolean; preserveUpdatedAt?: boolean }): Promise<Page | null> {
 	const contentPath = indexPath(store.dataDir, slug);
 	try {
 		await fs.access(contentPath);
@@ -94,11 +94,13 @@ export async function updatePage(store: Store, slug: string, content: string, op
 	await fs.writeFile(contentPath, content, "utf-8");
 	const now = new Date().toISOString();
 	const isPublic = options?.isPublic !== undefined ? options.isPublic : meta.public;
+	// preserveUpdatedAt: 백링크 자동 치환 등 기계적 변경은 수정시간을 갱신하지 않음
+	const updatedAt = options?.preserveUpdatedAt ? meta.updatedAt : now;
 	const doc = parseDocument(content);
 	const title = slugToTitle(slug);
-	await writeMeta(metaPath(store.dataDir, slug), { public: isPublic, updatedAt: now });
-	upsertSearchIndex(slug, title, doc.body, isPublic, now);
-	return { slug, title, content, isPublic, updatedAt: now };
+	await writeMeta(metaPath(store.dataDir, slug), { public: isPublic, updatedAt });
+	upsertSearchIndex(slug, title, doc.body, isPublic, updatedAt);
+	return { slug, title, content, isPublic, updatedAt };
 }
 
 // ── 백링크 갱신: 리네임 시 다른 페이지 본문의 절대 위키링크 [[oldSlug...]]를 [[newSlug...]]로 치환 ──
@@ -122,7 +124,8 @@ export async function rewriteBacklinks(store: Store, oldSlug: string, newSlug: s
 		if (!page) continue;
 		const rewritten = rewriteAbsoluteWikiLinks(page.content, oldSlug, newSlug);
 		if (rewritten === page.content) continue;
-		await updatePage(store, p.slug, rewritten);
+		// 백링크 치환은 기계적 변경 → 수정시간 보존
+		await updatePage(store, p.slug, rewritten, { preserveUpdatedAt: true });
 		updated++;
 	}
 	return { scanned, updated };
