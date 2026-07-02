@@ -68,35 +68,11 @@ Serve options: `--host <addr>` (default: `127.0.0.1`), `--port <number>` (defaul
 
 ### Remote commands
 
-```bash
-bakewiki remote [options] <command>
-```
+Manage a running server from the CLI — list, read, create, rename, patch, delete pages, search, and uploads. → **[Full remote CLI reference →](docs/remote.md)**
 
-| Command | Description | Auth |
-|---------|-------------|------|
-| `list` | List pages | Required |
-| `get <slug> [slug2 ...]` | Get page(s) — batch supported | Required |
-| `create <slug> <file>` | Create/update page | Required |
-| `rename <old> <new>` | Rename page | Required |
-| `patch <slug> [--slug ...] [--public ...] [--body ...]` | Partial update | Required |
-| `delete <slug>` | Delete page | Required |
-| `search <query>` | Search pages | Optional* |
-| `sitemap` | Show page tree | Optional* |
-| `health` | Health check | None |
-| `file list [--slug <slug>]` | List uploads (optional page filter) | Required / Optional* |
-| `file upload <file|-> [name] [--slug <slug>]` | Upload file | Required |
-| `file download <url|filename> [output|-]` | Download file | None |
-| `file delete <filename>` | Delete file | Required |
-
-*Works without auth, but private pages require authentication.
-
-Remote options: `--url <url>` (default: `http://127.0.0.1:3000`), `--key <apikey>` (`BAKEWIKI_API_KEY`)
-
-Options can go before or after the subcommand:
 ```bash
 bakewiki remote --key bk_xxx list
-bakewiki remote list --key bk_xxx
-bakewiki remote --url http://... --key bk_xxx get index
+bakewiki remote --key bk_xxx get index
 ```
 
 ### LLM commands
