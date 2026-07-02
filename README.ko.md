@@ -103,6 +103,8 @@ bakewiki remote --url http://... --key bk_xxx get index
 
 `remote`와 동일한 서브커맨드지만, LLM에 최적화된 출력. **`get`은 Markdown + YAML frontmatter, 나머지는 JSON.** → **[LLM CLI 전체 참조 →](docs/cli-llm.md)**
 
+bakewiki를 LLM 에이전트에 연결하고 싶다면, 바로 쓸 수 있는 **[LLM 시스템 프롬프트 →](docs/llm-prompt.md)**(세팅 + `bakewiki llm` 사용법)를 활용하세요.
+
 ```bash
 bakewiki llm --key bk_xxx list        # → JSON 배열
 bakewiki llm --key bk_xxx get index   # → Markdown + YAML frontmatter
