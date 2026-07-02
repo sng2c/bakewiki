@@ -2,6 +2,8 @@
 
 [![npm version](https://img.shields.io/npm/v/@sng2c/bakewiki?label=npm)](https://www.npmjs.com/package/@sng2c/bakewiki) [![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](https://github.com/sng2c/bakewiki)
 
+> **Thanks to [@ririnto](https://github.com/ririnto)** for the support that made this project possible.
+
 An open-source GFM wiki for humans and LLMs.
 
 ## Features

@@ -2,6 +2,8 @@
 
 [![npm version](https://img.shields.io/npm/v/@sng2c/bakewiki?label=npm)](https://www.npmjs.com/package/@sng2c/bakewiki) [![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](https://github.com/sng2c/bakewiki)
 
+> **이 프로젝트가 가능해지도록 지원해주신 [@ririnto](https://github.com/ririnto)님께 감사드립니다.**
+
 오픈소스 GFM 위키. 인간과 LLM 모두를 위한 지식 관리.
 
 ## 기능
