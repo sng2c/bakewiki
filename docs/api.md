@@ -56,7 +56,7 @@ Response `200`:
     "path": "",
     "slug": "home",
     "title": "Home",
-    "content": "# Home\n\nWelcome!",
+    "content": "Welcome!",
     "public": true,
     "updatedAt": "2026-06-29T12:00:00.000Z"
   }
@@ -80,9 +80,8 @@ Authorization: Bearer <api-key>
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `content` | string | Yes | Full page body (markdown) |
-| `title` | string | No | Override title |
 
-If `title` is omitted, it is extracted from the first `#` heading in `content`, or derived from the slug.
+The page title is always derived from the slug's last segment (rendered as the H1). Do not include a `#` heading in `content`.
 
 Response `200`:
 ```json
@@ -108,9 +107,8 @@ Authorization: Bearer <api-key>
 | `slug` | string | Rename to a new slug (does not create redirects) |
 | `public` | boolean | Change visibility |
 | `body` | string | Replace page body (markdown content only; metadata preserved) |
-| `title` | string | Override title |
 
-All fields are optional; include only the ones you want to change.
+All fields are optional; include only the ones you want to change. The title is always the slug's last segment.
 
 Response `200`:
 ```json

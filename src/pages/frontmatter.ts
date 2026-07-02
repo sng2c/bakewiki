@@ -6,7 +6,6 @@ export type Frontmatter = Record<string, unknown>;
 export type MetaData = {
 	public: boolean;
 	updatedAt: string;
-	title?: string;
 };
 
 export type ParsedDocument = {
@@ -31,21 +30,7 @@ export function parseDocument(raw: string): ParsedDocument {
 	return { frontmatter, body };
 }
 
-// title 추출: 첫 # 헤딩만 사용. 폴백용.
-export function extractTitle(doc: ParsedDocument): string | null {
-	const heading = doc.body.match(/^#\s+(.+)$/m);
-	if (heading) return heading[1].trim();
-	return null;
-}
-
-// title을 본문 첫 # 헤딩에서 추출. 헤딩이 없으면 제목을 헤딩으로 추가.
-export function ensureHeading(body: string, title: string): string {
-	const heading = body.match(/^#\s+(.+)$/m);
-	if (heading) return body;
-	return `# ${title}\n\n${body}`;
-}
-
-// meta.yml 읽기. 파일이 없거나 파싱 실패 시 기본값 반환.
+// meta.yml 읽기. 파일이 없거나 파싱 실패 시 기본값 반환. title은 더 이상 관리하지 않음.
 export async function readMeta(metaFilePath: string): Promise<MetaData> {
 	try {
 		const content = await fs.readFile(metaFilePath, "utf-8");
@@ -56,17 +41,15 @@ export async function readMeta(metaFilePath: string): Promise<MetaData> {
 		return {
 			public: typeof parsed.public === "boolean" ? parsed.public : true,
 			updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
-			title: typeof parsed.title === "string" ? parsed.title : undefined,
 		};
 	} catch {
 		return { public: true, updatedAt: new Date().toISOString() };
 	}
 }
 
-// meta.yml 쓰기.
+// meta.yml 쓰기. title은 더 이상 저장하지 않는다.
 export async function writeMeta(metaFilePath: string, meta: MetaData): Promise<void> {
 	const data: Record<string, unknown> = { public: meta.public, updatedAt: meta.updatedAt };
-	if (meta.title !== undefined) data.title = meta.title;
 	const content = stringifyYaml(data).trimEnd() + "\n";
 	await fs.writeFile(metaFilePath, content, "utf-8");
 }

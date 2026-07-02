@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import type { Store } from "../env.js";
 import { pagesDir, pageDir, indexPath, metaPath } from "../data.js";
-import { parseDocument, extractTitle, readMeta, writeMeta } from "./frontmatter.js";
+import { parseDocument, readMeta, writeMeta } from "./frontmatter.js";
 import { upsertSearchIndex, removeFromSearchIndex, renameSearchIndexPrefix } from "./search.js";
 
 // ── 타입 ──
@@ -54,8 +54,8 @@ export async function getPage(store: Store, slug: string): Promise<Page | null> 
 		const content = await fs.readFile(contentPath, "utf-8");
 		const meta = await readMeta(metaPath(store.dataDir, slug));
 		const doc = parseDocument(content);
-		// title: meta.yml > # heading > directory name
-		const title = meta.title ?? extractTitle(doc) ?? slugToTitle(slug);
+		// title: 항상 slug 마지막 세그먼트 (meta.yml title / 본문 헤딩 사용 안 함)
+		const title = slugToTitle(slug);
 		return { slug, title, content, isPublic: meta.public, updatedAt: meta.updatedAt };
 	} catch {
 		return null;
@@ -68,22 +68,22 @@ export async function listPages(store: Store, includePrivate = false): Promise<P
 	return listPagesFromIndex(includePrivate);
 }
 
-export async function createPage(store: Store, slug: string, content: string, options?: { title?: string; isPublic?: boolean }): Promise<Page> {
+export async function createPage(store: Store, slug: string, content: string, options?: { isPublic?: boolean }): Promise<Page> {
 	const resolvedSlug = slug || generateSlug();
 	const dir = pageDir(store.dataDir, resolvedSlug);
 	await fs.mkdir(dir, { recursive: true });
 	await fs.writeFile(indexPath(store.dataDir, resolvedSlug), content, "utf-8");
 	const now = new Date().toISOString();
 	const doc = parseDocument(content);
-	const title = options?.title ?? extractTitle(doc) ?? slugToTitle(resolvedSlug);
+	const title = slugToTitle(resolvedSlug);
 	const isPublic = options?.isPublic ?? true;
-	await writeMeta(metaPath(store.dataDir, resolvedSlug), { public: isPublic, updatedAt: now, title });
+	await writeMeta(metaPath(store.dataDir, resolvedSlug), { public: isPublic, updatedAt: now });
 	upsertSearchIndex(resolvedSlug, title, doc.body, isPublic, now);
 
 	return { slug: resolvedSlug, title, content, isPublic, updatedAt: now };
 }
 
-export async function updatePage(store: Store, slug: string, content: string, options?: { isPublic?: boolean; title?: string }): Promise<Page | null> {
+export async function updatePage(store: Store, slug: string, content: string, options?: { isPublic?: boolean }): Promise<Page | null> {
 	const contentPath = indexPath(store.dataDir, slug);
 	try {
 		await fs.access(contentPath);
@@ -95,8 +95,8 @@ export async function updatePage(store: Store, slug: string, content: string, op
 	const now = new Date().toISOString();
 	const isPublic = options?.isPublic !== undefined ? options.isPublic : meta.public;
 	const doc = parseDocument(content);
-	const title = options?.title ?? meta.title ?? extractTitle(doc) ?? slugToTitle(slug);
-	await writeMeta(metaPath(store.dataDir, slug), { public: isPublic, updatedAt: now, title });
+	const title = slugToTitle(slug);
+	await writeMeta(metaPath(store.dataDir, slug), { public: isPublic, updatedAt: now });
 	upsertSearchIndex(slug, title, doc.body, isPublic, now);
 	return { slug, title, content, isPublic, updatedAt: now };
 }
@@ -131,7 +131,7 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 	const content = await fs.readFile(indexPath(store.dataDir, newSlug), "utf-8");
 	const meta = await readMeta(metaPath(store.dataDir, newSlug));
 	const doc = parseDocument(content);
-	const title = meta.title ?? extractTitle(doc) ?? slugToTitle(newSlug);
+	const title = slugToTitle(newSlug);
 
 	return { slug: newSlug, title, content, isPublic: meta.public, updatedAt: meta.updatedAt };
 }

@@ -3,7 +3,7 @@ import type { Store } from "../env.js";
 import type { AuthUser } from "../env.js";
 import { getPage, listPages } from "../pages/store.js";
 import { effectiveVisibility, getPageMap, searchPages } from "../pages/search.js";
-import { parseDocument, extractTitle } from "../pages/frontmatter.js";
+import { parseDocument } from "../pages/frontmatter.js";
 import { renderTemplate } from "../render/hbs.js";
 
 type TreeNode = {

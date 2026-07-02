@@ -68,8 +68,8 @@ bakewiki llm --key bk_xxx get index docs/api
 ```
 ```json
 [
-  { "path": "", "slug": "index", "title": "Home", "content": "# Home\n\nWelcome!", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-  { "path": "docs", "slug": "docs/api", "title": "API Docs", "content": "# API Docs\n\n...", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+  { "path": "", "slug": "index", "title": "Home", "content": "Welcome!", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+  { "path": "docs", "slug": "docs/api", "title": "API Docs", "content": "...", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
 ]
 ```
 
@@ -112,7 +112,7 @@ Partially update a page. Only the specified fields are changed.
 ```bash
 bakewiki llm --key bk_xxx patch my-page --public false
 bakewiki llm --key bk_xxx patch my-page --body ./updated.md
-bakewiki llm --key bk_xxx patch my-page --slug new-name --title "Custom Title"
+bakewiki llm --key bk_xxx patch my-page --slug new-name
 bakewiki llm --key bk_xxx patch my-page --body -   # read body from stdin
 ```
 
@@ -121,7 +121,6 @@ bakewiki llm --key bk_xxx patch my-page --body -   # read body from stdin
 | `--slug <new-slug>` | Rename slug |
 | `--public <true\|false>` | Change visibility |
 | `--body <file\|->` | Replace body (`-` for stdin) |
-| `--title <title>` | Override title |
 
 Output:
 ```json

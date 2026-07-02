@@ -65,26 +65,21 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 		const store = c.get("store");
 
 		if (originalSlug) {
-			// 기존 문서 편집 — 내용/타이틀/public 먼저 업데이트
-			await updatePage(store, originalSlug, body, { isPublic, title: title || undefined });
+			// 기존 문서 편집 — title과 path에서 새 slug 유도
+			const originalLastSegment = originalSlug.includes("/")
+				? originalSlug.substring(originalSlug.lastIndexOf("/") + 1)
+				: originalSlug;
+			// title이 있으면 마지막 세그먼트를 title에서 유도, 없으면 기존 유지
+			const lastSegment = title ? (slugifyTitle(title) || generateSlug()) : originalLastSegment;
+			const newSlug = pagePath ? `${pagePath}/${lastSegment}` : lastSegment;
 
-			// path 변경 시 rename (하위 페이지도 함께 이동)
-			const originalPath = extractPath(originalSlug);
-			if (pagePath !== originalPath) {
-				const lastSegment = originalSlug.includes("/")
-					? originalSlug.substring(originalSlug.lastIndexOf("/") + 1)
-					: originalSlug;
-				const newSlug = pagePath ? `${pagePath}/${lastSegment}` : lastSegment;
-				if (newSlug !== originalSlug) {
-					const result = await renamePage(store, originalSlug, newSlug);
-					if (result) {
-						return c.redirect(`/pages/${newSlug}`);
-					}
-					// rename 실패(대상 충돌 등) — 기존 slug로 리다이렉트
-				}
+			let currentSlug = originalSlug;
+			if (newSlug !== originalSlug) {
+				const result = await renamePage(store, originalSlug, newSlug);
+				currentSlug = result ? newSlug : originalSlug;
 			}
-
-			return c.redirect(`/pages/${originalSlug}`);
+			await updatePage(store, currentSlug, body, { isPublic });
+			return c.redirect(`/pages/${currentSlug}`);
 		} else {
 			// 새 문서 — path + 타이틀에서 슬러그 유도, 없으면 nanoid
 			let slug: string;
@@ -104,7 +99,7 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 			if (existing2) {
 				slug = generateSlug();
 			}
-			await createPage(store, slug, body, { title: title || undefined, isPublic });
+			await createPage(store, slug, body, { isPublic });
 			// 임시 업로드를 실제 slug로 이관 + 본문 링크 갱신
 			const migrated = await migrateUploads(store.dataDir, "", slug);
 			if (migrated.length > 0) {
@@ -116,7 +111,6 @@ export function webEditRoutes(): Hono<{ Variables: { store: Store; user: AuthUse
 			}
 			return c.redirect(`/pages/${slug}`);
 		}
-		return c.redirect(`/pages/${originalSlug}`);
 	});
 
 	// 삭제: index.md + meta.yml 삭제, 검색 인덱스 제거 (디렉토리·첨부 유지)

@@ -73,7 +73,6 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 
 		const body = await c.req.json().catch(() => null);
 		const content = body?.content;
-		const title = typeof body?.title === "string" ? body.title : undefined;
 		if (typeof content !== "string") {
 			return c.json({ error: "content (string) is required" }, 400);
 		}
@@ -81,8 +80,8 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		const store = c.get("store");
 		const existing = await getPage(store, slug);
 		const saved = existing
-			? await updatePage(store, slug, content, { title })
-			: await createPage(store, slug, content, { title });
+			? await updatePage(store, slug, content)
+			: await createPage(store, slug, content);
 
 		const pageMap = getPageMap();
 		const vis = effectiveVisibility(saved!.slug, saved!.isPublic, pageMap);
@@ -117,10 +116,9 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 		const hasSlugChange = typeof body.slug === "string" && body.slug !== oldSlug;
 		const hasPublic = typeof body.public === "boolean";
 		const hasBody = typeof body.body === "string";
-		const hasTitle = typeof body.title === "string";
 
 		// 변경할 것이 없으면 400
-		if (!hasSlugChange && !hasPublic && !hasBody && !hasTitle) {
+		if (!hasSlugChange && !hasPublic && !hasBody) {
 			return c.json({ error: "No fields to update. Provide slug, public, or body." }, 400);
 		}
 
@@ -136,14 +134,13 @@ export function pageRoutes(): Hono<{ Variables: { store: Store; user: AuthUser |
 			currentSlug = newSlug;
 		}
 
-		// public, title 또는 body 변경이 있으면 콘텐츠/메타 업데이트
-		if (hasPublic || hasBody || hasTitle) {
+		// public 또는 body 변경이 있으면 콘텐츠/메타 업데이트
+		if (hasPublic || hasBody) {
 			const page = await getPage(store, currentSlug);
 			if (!page) return c.json({ error: "Not found" }, 404);
 			const content = hasBody ? body.body as string : page.content;
-			const options: { isPublic?: boolean; title?: string } = {};
+			const options: { isPublic?: boolean } = {};
 			if (hasPublic) options.isPublic = body.public as boolean;
-			if (hasTitle) options.title = body.title as string;
 			const saved = await updatePage(store, currentSlug, content, options);
 			const pageMap = getPageMap();
 			const vis = effectiveVisibility(saved!.slug, saved!.isPublic, pageMap);

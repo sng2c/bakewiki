@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { resolveDataDir, initDataDir, pagesDir, pageDir, indexPath, metaPath } from "../data.js";
-import { parseDocument, extractTitle, readMeta, writeMeta } from "../pages/frontmatter.js";
+import { parseDocument, readMeta, writeMeta } from "../pages/frontmatter.js";
 import { upsertSearchIndex } from "../pages/search.js";
 
 // 외부 .md 폴더 → 디렉토리 구조 동기화 (copy). 기존 페이지는 덮어쓰기.
@@ -37,8 +37,8 @@ export async function importCommand(dir: string, dataDir?: string): Promise<void
 		await writeMeta(metaPath(resolvedDataDir, slug), { public: isPublic, updatedAt });
 
 		// 검색 인덱스 갱신
-		const title = extractTitle(doc) ?? slug.split("/").pop()!;
-		upsertSearchIndex(slug, extractTitle(doc) ?? title, doc.body, isPublic, updatedAt);
+		const title = slug.split("/").pop()!;
+		upsertSearchIndex(slug, title, doc.body, isPublic, updatedAt);
 
 		created++;
 	}

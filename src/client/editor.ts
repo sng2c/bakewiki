@@ -32,12 +32,10 @@ if (import.meta.hot) {
 
 	if (!ta || !pv) return;
 
-	// Compute slug from path + first # heading in content
+	// Compute slug from path + title input (title drives the slug's last segment)
 	function computeSlug() {
 		var pagePath = pathInput ? pathInput.value.trim() : '';
-		var body = ta.value;
-		var match = body.match(/^#\s+(.+)$/m);
-		var title = match ? match[1].trim() : '';
+		var title = titleInput ? titleInput.value.trim() : '';
 		var slugifiedTitle = title
 			.replace(/\//g, '-')
 			.replace(/\s+/g, '-')

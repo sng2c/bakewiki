@@ -17,7 +17,8 @@ function emitMarkdown(page: { path: string; slug: string; title: string; content
 		`public: ${page.public}`,
 		`updatedAt: ${page.updatedAt}`,
 	].join("\n");
-	process.stdout.write(`---\n${frontmatter}\n---\n\n${page.content.trimEnd()}\n`);
+	// 저장된 본문에는 H1이 없으므로(렌더 레이어가 title을 H1으로 붙임) 동일하게 붙여서 출력.
+	process.stdout.write(`---\n${frontmatter}\n---\n\n# ${page.title}\n\n${page.content.trimEnd()}\n`);
 }
 
 function fail(message: string): never {
@@ -94,12 +95,11 @@ export async function llmCommand(subcommand: string, allArgs: string[], opts: Re
 			case "patch": {
 				validateKey(opts.key);
 				const patchSlug = rest[0];
-				if (!patchSlug) fail("Usage: llm patch <slug> [--slug <new>] [--public <bool>] [--body <file|->] [--title <title>]");
-				const fields: { slug?: string; public?: boolean; body?: string; title?: string } = {};
+				if (!patchSlug) fail("Usage: llm patch <slug> [--slug <new>] [--public <bool>] [--body <file|->]");
+				const fields: { slug?: string; public?: boolean; body?: string } = {};
 				for (let i = 1; i < rest.length; i++) {
 					if (rest[i] === "--slug" && rest[i + 1]) fields.slug = rest[++i];
 					else if (rest[i] === "--public" && rest[i + 1]) fields.public = rest[++i] === "true";
-					else if (rest[i] === "--title" && rest[i + 1]) fields.title = rest[++i];
 					else if (rest[i] === "--body" && rest[i + 1]) {
 						const bodyFile = rest[++i];
 						if (bodyFile === "-") {
@@ -113,7 +113,7 @@ export async function llmCommand(subcommand: string, allArgs: string[], opts: Re
 						}
 					}
 				}
-				if (Object.keys(fields).length === 0) fail("No fields to update. Provide --slug, --public, --body, or --title.");
+				if (Object.keys(fields).length === 0) fail("No fields to update. Provide --slug, --public, or --body.");
 				const patched = await client(opts).patchPage(patchSlug, fields);
 				emit(patched);
 				break;
@@ -259,7 +259,7 @@ function llmHelpCommand(): void {
 			get: { args: ["<slug>..."], description: "Get page content. Single slug outputs Markdown with YAML frontmatter; multiple slugs output JSON array", response: "Markdown: ---\npath: \"\"\nslug: index\n...\n---\n\n# Title\n\nContent" },
 			create: { args: ["<slug>", "<file>"], description: "Create or update a page from a markdown file", response: { path: "parent dir", slug: "full id", title: "display name" } },
 			rename: { args: ["<old>", "<new>"], description: "Rename a page", response: { path: "parent dir", slug: "new id", title: "display name" } },
-			patch: { args: ["<slug>"], options: ["--slug", "--public", "--body", "--title"], description: "Partially update a page", response: { path: "parent dir", slug: "id", title: "name", public: "boolean", updatedAt: "ISO date" } },
+			patch: { args: ["<slug>"], options: ["--slug", "--public", "--body"], description: "Partially update a page", response: { path: "parent dir", slug: "id", title: "name", public: "boolean", updatedAt: "ISO date" } },
 			delete: { args: ["<slug>"], description: "Delete a page", response: { deleted: "slug" } },
 			search: { args: ["<query>"], description: "Search pages", response: { query: "string", count: "number", results: [{ path: "parent dir", slug: "full id", title: "display name", snippet: "highlighted text" }] } },
 			sitemap: { args: [], description: "Show page tree", response: { tree: [{ path: "parent dir", name: "segment", slug: "full id", title: "display name", public: "boolean", children: [] }] } },

@@ -51,7 +51,7 @@ export class BakewikiClient {
 		return data as { path: string; slug: string; title: string };
 	}
 
-	async patchPage(slug: string, fields: { slug?: string; public?: boolean; body?: string; title?: string }): Promise<{ path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string }> {
+	async patchPage(slug: string, fields: { slug?: string; public?: boolean; body?: string }): Promise<{ path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string }> {
 		const { ok, status, data } = await this.request("PATCH", `/api/pages/${slug}`, fields);
 		if (!ok) throw new Error(`Failed to patch page: ${JSON.stringify(data)} (status ${status})`);
 		return data as { path: string; slug: string; title: string; public: boolean; inheritedPrivate?: boolean; updatedAt: string };

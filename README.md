@@ -149,7 +149,6 @@ Each page is a directory containing:
   ```yaml
   public: true
   updatedAt: "2026-06-29T12:00:00.000Z"
-  title: "Custom Title"    # optional override
   ```
 - **Attachments** — Any other files in the directory (images, etc.)
 
@@ -157,7 +156,7 @@ Each page is a directory containing:
 - **`path`** — Parent directory path (e.g. `tech/web`, empty string for root)
 - **`title`** — Display title (e.g. `HTTP`)
 
-Title resolution: `meta.yml title` → first `#` heading → slug last segment.
+Title resolution: the title is always the slug's last segment. The page render layer prepends `# <title>` as the H1, so page bodies should not contain their own `#` heading.
 
 ### Link resolution
 

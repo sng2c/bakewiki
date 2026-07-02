@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { pagesDir } from "../data.js";
-import { parseDocument, extractTitle, readMeta } from "./frontmatter.js";
+import { parseDocument, readMeta } from "./frontmatter.js";
 
 // ── 인메모리 검색 인덱스 ──
 // 서버 시작 시 빌드, 페이지 CRUD 시 갱신.
@@ -51,7 +51,7 @@ async function walkAndIndex(root: string, dir: string): Promise<void> {
 				const content = await fs.readFile(idxPath, "utf-8");
 				const meta = await readMeta(path.join(full, "meta.yml"));
 				const doc = parseDocument(content);
-				const title = meta.title ?? extractTitle(doc) ?? slug.split("/").pop()!;
+				const title = slug.split("/").pop()!;
 				index.set(slug, { title, content: doc.body, isPublic: meta.public, updatedAt: meta.updatedAt });
 			}
 		} catch {
