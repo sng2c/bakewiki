@@ -103,7 +103,7 @@ bakewiki remote --url http://... --key bk_xxx get index
 
 Same subcommands as `remote`, but output is optimized for LLMs. **`get` outputs Markdown with YAML frontmatter; all others output JSON.** → **[Full LLM CLI reference →](docs/cli-llm.md)**
 
-Want to plug bakewiki into an LLM agent? Use the ready-made **[LLM system prompt →](docs/llm-prompt.md)** (setup + `bakewiki llm` usage).
+Want to plug bakewiki into an LLM agent? Use the ready-made **[pi skill →](SKILL.md)** — a system prompt (setup + `bakewiki llm` usage) with skill frontmatter so pi can discover and trigger it automatically.
 
 ```bash
 bakewiki llm --key bk_xxx list        # → JSON array
