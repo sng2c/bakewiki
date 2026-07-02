@@ -1,9 +1,7 @@
-# bakewiki LLM CLI Prompt
-
-A system prompt for an LLM agent to use the `bakewiki llm` CLI. Paste the section below into the agent's system prompt.
-
-This prompt is also packaged as a ready-to-use **[pi skill](../SKILL.md)** — the same system prompt plus YAML frontmatter (`name`, `description`, `user-invocable`) so pi can discover and trigger it automatically.
-
+---
+name: bakewiki
+description: "Operate a BakeWiki knowledge base via the `bakewiki llm` CLI — read, create, update, rename, delete, and search wiki pages, plus manage uploaded files. Triggers: any mention of 'BakeWiki', editing/creating/searching wiki pages through bakewiki, or 'add to wiki' / 'what do I know about' when the wiki backend is BakeWiki."
+user-invocable: true
 ---
 
 ## System Prompt
