@@ -50,6 +50,12 @@ article { padding: 1rem; margin-top: 1rem; }
 article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
 article p:last-child { margin-bottom: 0; }
+/* 본문 가로 overflow 방지 (에디터 preview-pane 패턴 참고: min-width:0 + 요소별 스크롤) */
+#page-content { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+#page-content pre { overflow-x:auto; max-width:100%; }
+#page-content pre code { white-space:pre; }
+#page-content img { max-width:100%; height:auto; }
+#page-content table { display:block; overflow-x:auto; max-width:100%; }
 
 .page-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem 1rem; margin-bottom:1rem; }
 .page-header nav[aria-label="breadcrumb"] { margin:0; padding:0; }
