@@ -21,6 +21,8 @@ bakewiki llm list --key bk_xxx
 
 ## Subcommands
 
+> **Note:** The `title` field in every response is always the slug's last segment (e.g. slug `docs/api` → title `api`). There is no separate title input. The page H1 is rendered from this title, so page bodies should not contain their own `#` heading.
+
 ### list
 
 List all pages.
@@ -32,8 +34,8 @@ bakewiki llm --key bk_xxx list
 Output:
 ```json
 [
-  { "path": "", "slug": "index", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-  { "path": "docs", "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+  { "path": "", "slug": "index", "title": "index", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+  { "path": "docs", "slug": "docs/api", "title": "api", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
 ]
 ```
 
@@ -52,12 +54,12 @@ Single page output (Markdown):
 ---
 path: ""
 slug: index
-title: "Home"
+title: "index"
 public: true
 updatedAt: 2026-06-29T12:00:00.000Z
 ---
 
-# Home
+# index
 
 Welcome!
 ```
@@ -68,8 +70,8 @@ bakewiki llm --key bk_xxx get index docs/api
 ```
 ```json
 [
-  { "path": "", "slug": "index", "title": "Home", "content": "Welcome!", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-  { "path": "docs", "slug": "docs/api", "title": "API Docs", "content": "...", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
+  { "path": "", "slug": "index", "title": "index", "content": "Welcome!", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+  { "path": "docs", "slug": "docs/api", "title": "api", "content": "...", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" }
 ]
 ```
 
@@ -85,7 +87,7 @@ bakewiki llm --key bk_xxx create my-page ./content.md
 
 Output:
 ```json
-{ "path": "", "slug": "my-page", "title": "My Page" }
+{ "path": "", "slug": "my-page", "title": "my-page" }
 ```
 
 Auth: **required**
@@ -100,7 +102,7 @@ bakewiki llm --key bk_xxx rename old-slug new-slug
 
 Output:
 ```json
-{ "path": "", "slug": "new-slug", "title": "New Slug" }
+{ "path": "", "slug": "new-slug", "title": "new-slug" }
 ```
 
 Auth: **required**
@@ -124,7 +126,7 @@ bakewiki llm --key bk_xxx patch my-page --body -   # read body from stdin
 
 Output:
 ```json
-{ "path": "docs", "slug": "my-page", "title": "My Page", "public": false, "updatedAt": "2026-06-30T12:00:00.000Z" }
+{ "path": "docs", "slug": "my-page", "title": "my-page", "public": false, "updatedAt": "2026-06-30T12:00:00.000Z" }
 ```
 
 Auth: **required**
@@ -160,7 +162,7 @@ Output:
   "query": "wiki",
   "count": 1,
   "results": [
-    { "path": "", "slug": "index", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
+    { "path": "", "slug": "index", "title": "index", "snippet": "Welcome to the <mark>wiki</mark>" }
   ]
 }
 ```
@@ -183,7 +185,7 @@ Output:
       "path": "",
       "name": "index",
       "slug": "index",
-      "title": "Home",
+      "title": "index",
       "public": true,
       "children": []
     }

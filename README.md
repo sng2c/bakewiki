@@ -11,7 +11,7 @@ An open-source GFM wiki for humans and LLMs.
 - **GFM Markdown** — GitHub Flavored Markdown with code highlighting and KaTeX math
 - **Client-side rendering** — Page views and editor preview rendered in the browser (markdown-it + highlight.js + KaTeX)
 - **Filesystem-based** — Pages stored as `.md` files, version-controllable with Git
-- **Title-as-slug** — Page title (first `#` heading) determines the slug; Unicode supported
+- **Title-as-slug** — The page title is always the slug's last segment; the H1 is rendered from it. Unicode supported
 - **Hierarchical slugs** — Directory structure for organization, standard relative links
 - **Wiki-links** — `[[slug]]` syntax for absolute slug references, `[[slug|display]]` for custom text
 - **Image uploads** — Directory-based storage with `@@` content markers, auto-migrated on rename
@@ -78,7 +78,7 @@ bakewiki remote [options] <command>
 | `get <slug> [slug2 ...]` | Get page(s) — batch supported | Required |
 | `create <slug> <file>` | Create/update page | Required |
 | `rename <old> <new>` | Rename page | Required |
-| `patch <slug> [--slug ...] [--public ...] [--body ...] [--title ...]` | Partial update | Required |
+| `patch <slug> [--slug ...] [--public ...] [--body ...]` | Partial update | Required |
 | `delete <slug>` | Delete page | Required |
 | `search <query>` | Search pages | Optional* |
 | `sitemap` | Show page tree | Optional* |
@@ -188,7 +188,7 @@ Quick reference:
 | GET | `/api/pages` | Optional | List pages (public only without auth; private/protected excluded) |
 | GET | `/api/pages/:slug` | Optional | Get page (404 for private/protected without auth) |
 | POST | `/api/pages/:slug` | Required | Create or update page |
-| PATCH | `/api/pages/:slug` | Required | Partial update (slug, public, body, title) |
+| PATCH | `/api/pages/:slug` | Required | Partial update (slug, public, body) |
 | DELETE | `/api/pages/:slug` | Required | Delete page |
 | GET | `/api/search?q=` | Optional | Search pages |
 | GET | `/api/sitemap` | Optional | Page tree |
@@ -208,16 +208,6 @@ npm run check        # Type check
 ```
 
 Requires Node.js ≥ 22.
-
-## Migration
-
-To migrate from the old format (frontmatter `title` field) to the new format (title from first `#` heading):
-
-```bash
-node scripts/migrate-title-slug.mjs --data ./data
-```
-
-Use `--dry-run` to preview changes without modifying files.
 
 ## License
 

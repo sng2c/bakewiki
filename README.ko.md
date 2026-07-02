@@ -11,7 +11,7 @@
 - **GFM 마크다운** — GitHub Flavored Markdown + 코드 하이라이팅 + KaTeX 수식
 - **클라이언트 사이드 렌더링** — 페이지 조회와 에디터 미리보기를 브라우저에서 렌더링 (markdown-it + highlight.js + KaTeX)
 - **파일시스템 기반** — `.md` 파일로 저장, Git 버전 관리 가능
-- **Title=Slug 모델** — 첫 `#` 헤딩이 페이지 제목이자 슬러그, 유니코드 지원
+- **Title=Slug 모델** — 페이지 제목은 항상 slug의 마지막 세그먼트이며, H1은 이 제목에서 렌더링됩니다. 유니코드 지원
 - **계층 슬러그** — 디렉토리 구조로 페이지 조직화, 표준 상대 링크 지원
 - **위키링크** — `[[slug]]` 절대 슬러그 참조, `[[slug|표시 텍스트]]` 지원
 - **이미지 업로드** — 디렉토리 기반 저장 + `@@` 콘텐츠 마커, rename 시 자동 이관
@@ -78,7 +78,7 @@ bakewiki remote [options] <command>
 | `get <slug> [slug2 ...]` | 문서 조회 — 배치 지원 | 필수 |
 | `create <slug> <file>` | 문서 생성/수정 | 필수 |
 | `rename <old> <new>` | 문서 이름 변경 | 필수 |
-| `patch <slug> [--slug ...] [--public ...] [--body ...] [--title ...]` | 부분 업데이트 | 필수 |
+| `patch <slug> [--slug ...] [--public ...] [--body ...]` | 부분 업데이트 | 필수 |
 | `delete <slug>` | 문서 삭제 | 필수 |
 | `search <query>` | 문서 검색 | 선택* |
 | `sitemap` | 문서 트리 | 선택* |
@@ -188,7 +188,7 @@ data/
 | GET | `/api/pages` | 선택 | 문서 목록 (미인증: 공개만) |
 | GET | `/api/pages/:slug` | 선택 | 문서 조회 (비공개: 미인증 404) |
 | POST | `/api/pages/:slug` | 필수 | 문서 생성/수정 |
-| PATCH | `/api/pages/:slug` | 필수 | 부분 업데이트 (slug, public, body, title) |
+| PATCH | `/api/pages/:slug` | 필수 | 부분 업데이트 (slug, public, body) |
 | DELETE | `/api/pages/:slug` | 필수 | 문서 삭제 |
 | GET | `/api/search?q=` | 선택 | 문서 검색 |
 | GET | `/api/sitemap` | 선택 | 문서 트리 |
@@ -208,16 +208,6 @@ npm run check         # 타입 체크
 ```
 
 Node.js ≥ 22 필요.
-
-## 마이그레이션
-
-이전 형식(frontmatter `title` 필드)에서 새 형식(본문 첫 `#` 헤딩)으로 마이그레이션:
-
-```bash
-node scripts/migrate-title-slug.mjs --data ./data
-```
-
-`--dry-run`으로 변경 사항을 미리 확인.
 
 ## 라이선스
 

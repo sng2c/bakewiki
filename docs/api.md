@@ -30,9 +30,9 @@ Response `200`:
 ```json
 {
   "pages": [
-    { "path": "", "slug": "home", "title": "Home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
-    { "path": "docs", "slug": "docs/api", "title": "API Docs", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" },
-    { "path": "docs", "slug": "docs/public-child", "title": "Child", "public": true, "inheritedPrivate": true, "updatedAt": "2026-06-28T10:00:00.000Z" }
+    { "path": "", "slug": "home", "title": "home", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" },
+    { "path": "docs", "slug": "docs/api", "title": "api", "public": false, "updatedAt": "2026-06-28T09:00:00.000Z" },
+    { "path": "docs", "slug": "docs/public-child", "title": "public-child", "public": true, "inheritedPrivate": true, "updatedAt": "2026-06-28T10:00:00.000Z" }
   ]
 }
 ```
@@ -55,7 +55,7 @@ Response `200`:
   "page": {
     "path": "",
     "slug": "home",
-    "title": "Home",
+    "title": "home",
     "content": "Welcome!",
     "public": true,
     "updatedAt": "2026-06-29T12:00:00.000Z"
@@ -85,7 +85,7 @@ The page title is always derived from the slug's last segment (rendered as the H
 
 Response `200`:
 ```json
-{ "path": "", "slug": "my-page", "title": "My Page", "public": true, "updatedAt": "2026-06-29T12:00:00.000Z" }
+{ "path": "", "slug": "my-page", "title": "my-page", "public": true, "updatedAt": "2026-07-02T12:00:00.000Z" }
 ```
 
 | Status | Condition |
@@ -112,7 +112,7 @@ All fields are optional; include only the ones you want to change. The title is 
 
 Response `200`:
 ```json
-{ "path": "docs", "slug": "docs/new-name", "title": "New Title", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
+{ "path": "docs", "slug": "docs/new-name", "title": "new-name", "public": true, "updatedAt": "2026-06-30T12:00:00.000Z" }
 ```
 
 | Status | Condition |
@@ -149,7 +149,7 @@ Response `200`:
 ```json
 {
   "results": [
-    { "path": "", "slug": "home", "title": "Home", "snippet": "Welcome to the <mark>wiki</mark>" }
+    { "path": "", "slug": "home", "title": "home", "snippet": "Welcome to the <mark>wiki</mark>" }
   ]
 }
 ```
@@ -172,14 +172,14 @@ Response `200`:
       "path": "",
       "name": "home",
       "slug": "home",
-      "title": "Home",
+      "title": "home",
       "public": true,
       "children": [
         {
           "path": "docs",
           "name": "api",
           "slug": "docs/api",
-          "title": "API Docs",
+          "title": "api",
           "public": false,
           "children": []
         }
