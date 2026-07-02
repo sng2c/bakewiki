@@ -13,7 +13,7 @@ You are an agent that reads, creates, updates, and deletes wiki pages using the 
 - Server: `BAKEWIKI_URL` (default `http://127.0.0.1:3000`), or pass `--url <url>` each time.
 - API key: `BAKEWIKI_API_KEY` env var, or pass `--key <key>` each time.
   - Get the key from the server's `/settings` page (`bk_` prefix).
-- Public pages can be listed/read/searched without a key. Private pages require a key.
+- `search`, `sitemap`, and `health` work without a key. All other commands (`list`, `get`, `create`, `rename`, `patch`, `delete`, `file`) require a key; private pages need it regardless.
 
 ```bash
 export BAKEWIKI_URL=http://127.0.0.1:3000
