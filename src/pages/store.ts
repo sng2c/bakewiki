@@ -101,6 +101,33 @@ export async function updatePage(store: Store, slug: string, content: string, op
 	return { slug, title, content, isPublic, updatedAt: now };
 }
 
+// ── 백링크 갱신: 리네임 시 다른 페이지 본문의 절대 위키링크 [[oldSlug...]]를 [[newSlug...]]로 치환 ──
+// 절대 위키링크만 처리 ([[target]] / [[target|disp]] / [[target/...]]).
+// 상대 위키링크는 미지원이므로 고려 대상 아님. 내용이 바뀐 페이지만 재저장(불필요한 updatedAt 갱신 방지).
+function rewriteAbsoluteWikiLinks(content: string, oldSlug: string, newSlug: string): string {
+	const escaped = oldSlug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	// [[oldSlug 바로 뒤에 경계(/ | ] | |)가 오는 경우만 치환 → [[oldSlugX]] 오매칭 방지
+	const re = new RegExp(`\\[\\[${escaped}(?=\\/|\\]|\\|)`, "g");
+	return content.replace(re, `[[${newSlug}`);
+}
+
+export async function rewriteBacklinks(store: Store, oldSlug: string, newSlug: string): Promise<{ scanned: number; updated: number }> {
+	if (!oldSlug || oldSlug === newSlug) return { scanned: 0, updated: 0 };
+	const pages = await listPages(store, true); // private 포함 전체 스캔
+	let scanned = 0;
+	let updated = 0;
+	for (const p of pages) {
+		scanned++;
+		const page = await getPage(store, p.slug);
+		if (!page) continue;
+		const rewritten = rewriteAbsoluteWikiLinks(page.content, oldSlug, newSlug);
+		if (rewritten === page.content) continue;
+		await updatePage(store, p.slug, rewritten);
+		updated++;
+	}
+	return { scanned, updated };
+}
+
 // ── 이름 변경 (디렉토리 rename) ──
 export async function renamePage(store: Store, oldSlug: string, newSlug: string): Promise<Page | null> {
 	const oldDir = pageDir(store.dataDir, oldSlug);
@@ -127,6 +154,9 @@ export async function renamePage(store: Store, oldSlug: string, newSlug: string)
 
 	// 검색 인덱스 갱신 (본인 + 하위 페이지 모두)
 	renameSearchIndexPrefix(oldSlug, newSlug);
+
+	// 다른 페이지의 절대 위키링크 백링크도 함께 갱신 ([[oldSlug...]] → [[newSlug...]])
+	await rewriteBacklinks(store, oldSlug, newSlug);
 
 	const content = await fs.readFile(indexPath(store.dataDir, newSlug), "utf-8");
 	const meta = await readMeta(metaPath(store.dataDir, newSlug));
