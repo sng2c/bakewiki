@@ -59,8 +59,6 @@ public: true
 updatedAt: 2026-06-29T12:00:00.000Z
 ---
 
-# index
-
 Welcome!
 ```
 

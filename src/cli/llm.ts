@@ -17,8 +17,7 @@ function emitMarkdown(page: { path: string; slug: string; title: string; content
 		`public: ${page.public}`,
 		`updatedAt: ${page.updatedAt}`,
 	].join("\n");
-	// 저장된 본문에는 H1이 없으므로(렌더 레이어가 title을 H1으로 붙임) 동일하게 붙여서 출력.
-	process.stdout.write(`---\n${frontmatter}\n---\n\n# ${page.title}\n\n${page.content.trimEnd()}\n`);
+	process.stdout.write(`---\n${frontmatter}\n---\n\n${page.content.trimEnd()}\n`);
 }
 
 function fail(message: string): never {
@@ -256,7 +255,7 @@ function llmHelpCommand(): void {
 		},
 		subcommands: {
 			list: { args: [], description: "List all pages", response: [{ path: "parent dir", slug: "full id", title: "display name", public: "boolean", updatedAt: "ISO date" }] },
-			get: { args: ["<slug>..."], description: "Get page content. Single slug outputs Markdown with YAML frontmatter; multiple slugs output JSON array", response: "Markdown: ---\npath: \"\"\nslug: index\n...\n---\n\n# Title\n\nContent" },
+			get: { args: ["<slug>..."], description: "Get page content. Single slug outputs Markdown with YAML frontmatter; multiple slugs output JSON array", response: "Markdown: ---\npath: \"\"\nslug: index\n...\n---\n\nContent" },
 			create: { args: ["<slug>", "<file>"], description: "Create or update a page from a markdown file", response: { path: "parent dir", slug: "full id", title: "display name" } },
 			rename: { args: ["<old>", "<new>"], description: "Rename a page", response: { path: "parent dir", slug: "new id", title: "display name" } },
 			patch: { args: ["<slug>"], options: ["--slug", "--public", "--body"], description: "Partially update a page", response: { path: "parent dir", slug: "id", title: "name", public: "boolean", updatedAt: "ISO date" } },
